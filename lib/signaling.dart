@@ -7,15 +7,14 @@ typedef StreamStateCallback = void Function(MediaStream stream);
 typedef ConnectionClosedCallback = RTCVideoRenderer Function();
 
 class Signaling {
-  Map<String, dynamic> configuration = {
+  final configuration = {
     'iceServers': [
       {
-        //'urls': ['stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302']
-
-        // STUNTMAN Version 1.2. - an open source STUN server and client code by john selbie. Compliant with the latest RFCs including 5389, 5769, and 5780. Also includes backwards compatibility for RFC 3489.
-        // https://github.com/jselbie/stunserver
-        'urls': ['stun:77.81.230.199:3478']
-      }
+        // coturn server on ubuntu
+        'url': 'turn:77.81.230.199:3478',
+        'username': 'guest',
+        'credential': 'METTEREPSW',
+      },
     ]
   };
 
