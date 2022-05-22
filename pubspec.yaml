@@ -1,5 +1,5 @@
-name: allyfewebrtc
-description: A new Flutter project.
+name: flutter_firebase_video_call_webrtc
+description: a Flutter Video Call Demo using WebRTC, Coturn and Firebase
 
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
@@ -34,10 +34,10 @@ dependencies:
   # The following adds the Cupertino Icons font to your application.
   # Use with the CupertinoIcons class for iOS style icons.
   cupertino_icons: ^1.0.2
+  flutter_webrtc: ^0.8.7
   firebase_core: ^1.12.0
-  cloud_firestore: ^3.1.7
-  cloud_firestore_web: ^2.6.7
-  flutter_webrtc: ^0.8.1
+  cloud_firestore: ^3.1.9
+  cloud_firestore_web: ^2.6.9
   http: ^0.13.4
 
 dev_dependencies:

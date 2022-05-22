@@ -1,4 +1,4 @@
-package com.example.allyfewebrtc
+package it.maionemiky.flutter_firebase_video_call_webrtc
 
 import io.flutter.embedding.android.FlutterActivity
 

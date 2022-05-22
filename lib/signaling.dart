@@ -4,8 +4,6 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 
-import 'turn.dart' if (dart.library.js) 'turn_web.dart';
-
 typedef StreamStateCallback = void Function(MediaStream stream);
 typedef ConnectionClosedCallback = RTCVideoRenderer Function();
 
@@ -17,25 +15,16 @@ class Signaling {
   String? currentRoomText;
   StreamStateCallback? onAddRemoteStream;
 
-  Map<String, dynamic>? _iceServers;
-
-  Future<Map<String, dynamic>> getIceServers() async {
-    if (_iceServers == null) {
-      final _turnCredential = await getTurnCredential('videocall.proconsent.health', 8086);
-
-      _iceServers = {
-        'iceServers': [
-          {
-            'urls': _turnCredential['uris'][0],
-            'username': _turnCredential['username'],
-            'credential': _turnCredential['password'],
-          },
-        ]
-      };
-    }
-
-    return _iceServers!;
-  }
+  final iceServers = {
+    'iceServers': [
+      {
+        // coturn server on ubuntu
+        'url': 'turn:80.211.89.209:3478',
+        'username': 'guest',
+        'credential': 'METTEREPSW',
+      },
+    ]
+  };
 
   Future<int> cameraCount() async {
     final cams = await Helper.cameras;
@@ -71,16 +60,14 @@ class Signaling {
   }
 
   Future<String> createRoom(RTCVideoRenderer remoteRenderer) async {
-    final configuration = await getIceServers();
-
     final db = FirebaseFirestore.instance;
     final roomRef = db.collection('rooms').doc();
 
     if (kDebugMode) {
-      print('Create PeerConnection with configuration: $configuration');
+      print('Create PeerConnection with configuration: $iceServers');
     }
 
-    peerConnection = await createPeerConnection(configuration);
+    peerConnection = await createPeerConnection(iceServers);
 
     registerPeerConnectionListeners();
 
@@ -89,9 +76,9 @@ class Signaling {
     });
 
     // Code for collecting ICE candidates below
-    var callerCandidatesCollection = roomRef.collection('callerCandidates');
+    final callerCandidatesCollection = roomRef.collection('callerCandidates');
 
-    peerConnection?.onIceCandidate = (RTCIceCandidate candidate) {
+    peerConnection?.onIceCandidate = (candidate) {
       if (kDebugMode) {
         print('Got candidate: ${candidate.toMap()}');
       }
@@ -118,7 +105,7 @@ class Signaling {
     currentRoomText = 'Current room is $roomId - You are the caller!';
     // Created a Room
 
-    peerConnection?.onTrack = (RTCTrackEvent event) {
+    peerConnection?.onTrack = (event) {
       if (kDebugMode) {
         print('Got remote track: ${event.streams[0]}');
       }
@@ -192,12 +179,10 @@ class Signaling {
     }
 
     if (roomSnapshot.exists) {
-      final configuration = await getIceServers();
-
       if (kDebugMode) {
-        print('Create PeerConnection with configuration: $configuration');
+        print('Create PeerConnection with configuration: $iceServers');
       }
-      peerConnection = await createPeerConnection(configuration);
+      peerConnection = await createPeerConnection(iceServers);
 
       registerPeerConnectionListeners();
 
@@ -206,8 +191,8 @@ class Signaling {
       });
 
       // Code for collecting ICE candidates below
-      var calleeCandidatesCollection = roomRef.collection('calleeCandidates');
-      peerConnection!.onIceCandidate = (RTCIceCandidate candidate) {
+      final calleeCandidatesCollection = roomRef.collection('calleeCandidates');
+      peerConnection!.onIceCandidate = (candidate) {
         if (kDebugMode) {
           print('onIceCandidate: ${candidate.toMap()}');
         }
@@ -216,14 +201,16 @@ class Signaling {
       };
       // Code for collecting ICE candidate above
 
-      peerConnection?.onTrack = (RTCTrackEvent event) {
+      peerConnection?.onTrack = (event) {
         if (kDebugMode) {
           print('Got remote track: ${event.streams[0]}');
         }
+
         event.streams[0].getTracks().forEach((track) {
           if (kDebugMode) {
             print('Add a track to the remoteStream: $track');
           }
+
           remoteStream?.addTrack(track);
         });
       };
@@ -300,12 +287,12 @@ class Signaling {
       final roomRef = db.collection('rooms').doc(roomId);
       final calleeCandidates = await roomRef.collection('calleeCandidates').get();
 
-      for (var document in calleeCandidates.docs) {
+      for (final document in calleeCandidates.docs) {
         document.reference.delete();
       }
 
       final callerCandidates = await roomRef.collection('callerCandidates').get();
-      for (var document in callerCandidates.docs) {
+      for (final document in callerCandidates.docs) {
         document.reference.delete();
       }
 
@@ -320,31 +307,31 @@ class Signaling {
   }
 
   void registerPeerConnectionListeners() {
-    peerConnection?.onIceGatheringState = (RTCIceGatheringState state) {
+    peerConnection?.onIceGatheringState = (state) {
       if (kDebugMode) {
         print('ICE gathering state changed: $state');
       }
     };
 
-    peerConnection?.onConnectionState = (RTCPeerConnectionState state) {
+    peerConnection?.onConnectionState = (state) {
       if (kDebugMode) {
         print('Connection state change: $state');
       }
     };
 
-    peerConnection?.onSignalingState = (RTCSignalingState state) {
+    peerConnection?.onSignalingState = (state) {
       if (kDebugMode) {
         print('Signaling state change: $state');
       }
     };
 
-    peerConnection?.onIceGatheringState = (RTCIceGatheringState state) {
+    peerConnection?.onIceGatheringState = (state) {
       if (kDebugMode) {
         print('ICE connection state change: $state');
       }
     };
 
-    peerConnection?.onAddStream = (MediaStream stream) {
+    peerConnection?.onAddStream = (stream) {
       if (kDebugMode) {
         print("Add remote stream");
       }

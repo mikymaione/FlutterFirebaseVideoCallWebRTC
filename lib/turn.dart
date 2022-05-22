@@ -7,7 +7,7 @@ import 'package:flutter/foundation.dart';
 Future<Map<String, dynamic>> getTurnCredential(String host, int port) async {
   final client = HttpClient(context: SecurityContext());
 
-  client.badCertificateCallback = (X509Certificate cert, String host, int port) {
+  client.badCertificateCallback = (cert, host, port) {
     if (kDebugMode) {
       print('getTurnCredential: Allow self-signed certificate => $host:$port. ');
     }

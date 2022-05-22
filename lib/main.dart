@@ -1,7 +1,7 @@
-import 'package:allyfewebrtc/firebase_options.dart';
-import 'package:allyfewebrtc/signaling.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_firebase_video_call_webrtc/firebase_options.dart';
+import 'package:flutter_firebase_video_call_webrtc/signaling.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 
 Future<void> main() async {
