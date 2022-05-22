@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "340047693711",
+    "project_id": "firebase-video-call-webrtc",
+    "storage_bucket": "firebase-video-call-webrtc.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:340047693711:android:65c14573347575a15a6dfa",
+        "android_client_info": {
+          "package_name": "it.maionemiky.flutter_firebase_video_call_webrtc"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "340047693711-mm95gqnaiev9dcemm48ls099sfiq2ons.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA05KPMeRCE4V8xnT2YeLpPlPLQm5gtxgM"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "340047693711-mm95gqnaiev9dcemm48ls099sfiq2ons.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
