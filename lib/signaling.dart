@@ -59,7 +59,7 @@ class Signaling {
     }
   }
 
-  Future<String> createRoom(RTCVideoRenderer remoteRenderer) async {
+  Future<String> createRoom() async {
     final db = FirebaseFirestore.instance;
     final roomRef = db.collection('rooms').doc();
 

@@ -73,7 +73,7 @@ class _MyHomePageState extends State<MyHomePage> {
   Future<void> _createRoom() async {
     await signaling.openUserMedia(localRenderer, remoteRenderer);
 
-    final _roomId = await signaling.createRoom(remoteRenderer);
+    final _roomId = await signaling.createRoom();
 
     setState(() => textEditingController.text = _roomId);
   }
