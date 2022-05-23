@@ -33,18 +33,18 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  final _localRenderer = RTCVideoRenderer();
-  final _remoteRenderer = RTCVideoRenderer();
-  final _textEditingController = TextEditingController(text: '');
-  final _signaling = Signaling();
+  final localRenderer = RTCVideoRenderer();
+  final remoteRenderer = RTCVideoRenderer();
+  final textEditingController = TextEditingController(text: '');
+  final signaling = Signaling();
 
   @override
   void initState() {
-    _localRenderer.initialize();
-    _remoteRenderer.initialize();
+    localRenderer.initialize();
+    remoteRenderer.initialize();
 
-    _signaling.onAddRemoteStream = ((stream) {
-      _remoteRenderer.srcObject = stream;
+    signaling.onAddRemoteStream = ((stream) {
+      remoteRenderer.srcObject = stream;
       setState(() {});
     });
 
@@ -53,8 +53,8 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   void dispose() {
-    _localRenderer.dispose();
-    _remoteRenderer.dispose();
+    localRenderer.dispose();
+    remoteRenderer.dispose();
     super.dispose();
   }
 
@@ -65,22 +65,22 @@ class _MyHomePageState extends State<MyHomePage> {
 
   void _hangUp() {
     setState(() {
-      _signaling.hangUp(_localRenderer);
-      _textEditingController.text = '';
+      signaling.hangUp(localRenderer);
+      textEditingController.text = '';
     });
   }
 
   Future<void> _createRoom() async {
-    await _signaling.openUserMedia(_localRenderer, _remoteRenderer);
+    await signaling.openUserMedia(localRenderer, remoteRenderer);
 
-    final _roomId = await _signaling.createRoom(_remoteRenderer);
+    final _roomId = await signaling.createRoom(remoteRenderer);
 
-    setState(() => _textEditingController.text = _roomId);
+    setState(() => textEditingController.text = _roomId);
   }
 
   Future<void> _joinRoom() async {
-    await _signaling.openUserMedia(_localRenderer, _remoteRenderer);
-    _signaling.joinRoom(_textEditingController.text);
+    await signaling.openUserMedia(localRenderer, remoteRenderer);
+    signaling.joinRoom(textEditingController.text);
   }
 
   @override
@@ -91,42 +91,43 @@ class _MyHomePageState extends State<MyHomePage> {
       floatingActionButton: Wrap(
         spacing: 15,
         children: [
-          FloatingActionButton(
-            tooltip: 'Create room',
-            backgroundColor: Colors.cyan,
-            child: const Icon(Icons.video_call),
-            onPressed: () => _createRoom(),
-          ),
-          FloatingActionButton(
-            tooltip: 'Join room',
-            child: const Icon(Icons.add_call),
-            backgroundColor: Colors.green,
-            onPressed: () => _joinRoom(), // Add roomId
-          ),
-          if (_signaling.isLocalStreamOk()) ...[
+          if (!signaling.isLocalStreamOk()) ...[
+            FloatingActionButton(
+              tooltip: 'Create room',
+              backgroundColor: Colors.cyan,
+              child: const Icon(Icons.video_call),
+              onPressed: () => _createRoom(),
+            ),
+            FloatingActionButton(
+              tooltip: 'Join room',
+              child: const Icon(Icons.add_call),
+              backgroundColor: Colors.green,
+              onPressed: () => _joinRoom(), // Add roomId
+            ),
+          ] else ...[
             FutureBuilder<int>(
-              future: _signaling.cameraCount(),
+              future: signaling.cameraCount(),
               initialData: 0,
               builder: (context, snap) => FloatingActionButton(
                 tooltip: 'Switch camera',
                 backgroundColor: Colors.blueGrey,
                 child: const Icon(Icons.switch_camera),
-                onPressed: (snap.data ?? 0) > 1 ? () => _signaling.switchCamera() : null,
+                onPressed: (snap.data ?? 0) > 1 ? () => signaling.switchCamera() : null,
               ),
             ),
             FloatingActionButton(
-              tooltip: _signaling.isMicMuted() ? 'Un-mute mic' : 'Mute mic',
+              tooltip: signaling.isMicMuted() ? 'Un-mute mic' : 'Mute mic',
               backgroundColor: Colors.brown,
-              child: _signaling.isMicMuted() ? const Icon(Icons.mic_outlined) : const Icon(Icons.mic_off),
-              onPressed: () => _signaling.muteMic(),
+              child: signaling.isMicMuted() ? const Icon(Icons.mic_outlined) : const Icon(Icons.mic_off),
+              onPressed: () => signaling.muteMic(),
+            ),
+            FloatingActionButton(
+              tooltip: 'Hangup',
+              backgroundColor: Colors.red,
+              child: const Icon(Icons.call_end),
+              onPressed: () => _hangUp(),
             ),
           ],
-          FloatingActionButton(
-            tooltip: 'Hangup',
-            backgroundColor: Colors.red,
-            child: const Icon(Icons.call_end),
-            onPressed: () => _hangUp(),
-          ),
         ],
       ),
       body: Column(
@@ -139,7 +140,7 @@ class _MyHomePageState extends State<MyHomePage> {
               children: [
                 const Text("Room ID: "),
                 Flexible(
-                  child: TextFormField(controller: _textEditingController),
+                  child: TextFormField(controller: textEditingController),
                 )
               ],
             ),
@@ -151,19 +152,19 @@ class _MyHomePageState extends State<MyHomePage> {
               margin: const EdgeInsets.all(8.0),
               child: view(
                 children: [
-                  if (_signaling.localStream != null) ...[
+                  if (signaling.localStream != null) ...[
                     Expanded(
                       child: Container(
                         margin: const EdgeInsets.all(8.0),
-                        child: RTCVideoView(_localRenderer, mirror: true),
+                        child: RTCVideoView(localRenderer, mirror: true),
                       ),
                     ),
                   ],
-                  if (_signaling.remoteStream != null) ...[
+                  if (signaling.remoteStream != null) ...[
                     Expanded(
                       child: Container(
                         margin: const EdgeInsets.all(8.0),
-                        child: RTCVideoView(_remoteRenderer),
+                        child: RTCVideoView(remoteRenderer),
                       ),
                     ),
                   ],

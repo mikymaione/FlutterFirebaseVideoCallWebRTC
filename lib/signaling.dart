@@ -18,10 +18,10 @@ class Signaling {
   final iceServers = {
     'iceServers': [
       {
-        // coturn server on ubuntu
-        'url': 'turn:80.211.89.209:3478',
-        'username': 'guest',
-        'credential': 'METTEREPSW',
+        // coturn server
+        'urls': ['turn:80.211.89.209:3478'],
+        'username': 'coturn',
+        'credential': 'coturn',
       },
     ]
   };
