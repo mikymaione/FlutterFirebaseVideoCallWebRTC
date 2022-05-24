@@ -34,27 +34,44 @@ class MyHomePage extends StatefulWidget {
 
 class _MyHomePageState extends State<MyHomePage> {
   final localRenderer = RTCVideoRenderer();
-  final remoteRenderer = RTCVideoRenderer();
-  final textEditingController = TextEditingController(text: '');
+  final Map<String, RTCVideoRenderer> remoteRenderers = {};
+
   final signaling = Signaling();
 
   @override
   void initState() {
-    localRenderer.initialize();
-    remoteRenderer.initialize();
-
-    signaling.onAddRemoteStream = ((stream) {
-      remoteRenderer.srcObject = stream;
-      setState(() {});
-    });
-
     super.initState();
+
+    signaling.onRemoveRemoteStream = (peerUuid) {
+      remoteRenderers[peerUuid]!.srcObject = null;
+      remoteRenderers[peerUuid]!.dispose();
+      remoteRenderers.remove(peerUuid);
+    };
+
+    signaling.onAddLocalStream = (peerUuid, stream) async {
+      await localRenderer.initialize();
+      setState(() => localRenderer.srcObject = stream);
+    };
+
+    signaling.onAddRemoteStream = (peerUuid, stream) async {
+      final remoteRenderer = RTCVideoRenderer();
+      await remoteRenderer.initialize();
+      remoteRenderer.srcObject = stream;
+
+      setState(() => remoteRenderers.putIfAbsent(peerUuid, () => remoteRenderer));
+    };
   }
 
   @override
   void dispose() {
     localRenderer.dispose();
-    remoteRenderer.dispose();
+
+    for (final remoteRenderer in remoteRenderers.values) {
+      remoteRenderer.dispose();
+    }
+
+    remoteRenderers.clear();
+
     super.dispose();
   }
 
@@ -66,21 +83,13 @@ class _MyHomePageState extends State<MyHomePage> {
   void _hangUp() {
     setState(() {
       signaling.hangUp(localRenderer);
-      textEditingController.text = '';
+
+      for (final remoteRenderer in remoteRenderers.values) {
+        remoteRenderer.dispose();
+      }
+
+      remoteRenderers.clear();
     });
-  }
-
-  Future<void> _createRoom() async {
-    await signaling.openUserMedia(localRenderer, remoteRenderer);
-
-    final _roomId = await signaling.createRoom();
-
-    setState(() => textEditingController.text = _roomId);
-  }
-
-  Future<void> _joinRoom() async {
-    await signaling.openUserMedia(localRenderer, remoteRenderer);
-    signaling.joinRoom(textEditingController.text);
   }
 
   @override
@@ -93,16 +102,10 @@ class _MyHomePageState extends State<MyHomePage> {
         children: [
           if (!signaling.isLocalStreamOk()) ...[
             FloatingActionButton(
-              tooltip: 'Create room',
-              backgroundColor: Colors.cyan,
-              child: const Icon(Icons.video_call),
-              onPressed: () => _createRoom(),
-            ),
-            FloatingActionButton(
               tooltip: 'Join room',
               child: const Icon(Icons.add_call),
               backgroundColor: Colors.green,
-              onPressed: () => _joinRoom(), // Add roomId
+              onPressed: () => signaling.join(),
             ),
           ] else ...[
             FutureBuilder<int>(
@@ -130,49 +133,30 @@ class _MyHomePageState extends State<MyHomePage> {
           ],
         ],
       ),
-      body: Column(
-        children: [
-          // room
-          Container(
-            margin: const EdgeInsets.all(8.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text("Room ID: "),
-                Flexible(
-                  child: TextFormField(controller: textEditingController),
-                )
-              ],
-            ),
-          ),
-
-          // video call
-          Expanded(
-            child: Container(
-              margin: const EdgeInsets.all(8.0),
-              child: view(
-                children: [
-                  if (signaling.localStream != null) ...[
-                    Expanded(
-                      child: Container(
-                        margin: const EdgeInsets.all(8.0),
-                        child: RTCVideoView(localRenderer, mirror: true),
-                      ),
-                    ),
-                  ],
-                  if (signaling.remoteStream != null) ...[
-                    Expanded(
-                      child: Container(
-                        margin: const EdgeInsets.all(8.0),
-                        child: RTCVideoView(remoteRenderer),
-                      ),
-                    ),
-                  ],
-                ],
+      body: Container(
+        margin: const EdgeInsets.all(8.0),
+        child: view(
+          children: [
+            if (localRenderer.srcObject != null) ...[
+              Expanded(
+                child: Container(
+                  margin: const EdgeInsets.all(8.0),
+                  child: RTCVideoView(localRenderer, mirror: true),
+                ),
               ),
-            ),
-          ),
-        ],
+            ],
+            for (final remoteRenderer in remoteRenderers.values) ...[
+              if (remoteRenderer.srcObject != null) ...[
+                Expanded(
+                  child: Container(
+                    margin: const EdgeInsets.all(8.0),
+                    child: RTCVideoView(remoteRenderer),
+                  ),
+                ),
+              ],
+            ],
+          ],
+        ),
       ),
     );
   }
