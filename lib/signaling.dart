@@ -28,7 +28,7 @@ class Signaling {
 
   final appointmentId = 'UoCaFPedwvAKZPFdmaqc';
 
-  StreamSubscription? listenerConnectionParams, listenerPeers;
+  StreamSubscription? listenerConnectionParams;
 
   static const _chars = 'AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz1234567890';
   static final _rnd = Random();
@@ -81,10 +81,10 @@ class Signaling {
 
   Future<void> hangUp(RTCVideoRenderer localVideo) async {
     listenerConnectionParams?.cancel();
-    listenerPeers?.cancel();
 
-    localVideo.srcObject!.getTracks().forEach((track) => track.stop());
+    localVideo.srcObject = null;
 
+    localStream?.getTracks().forEach((track) => track.stop());
     localStream?.dispose();
     localStream = null;
 
@@ -110,8 +110,7 @@ class Signaling {
   Future<void> join() async {
     await _openUserMedia();
 
-    // New Peers
-    FirebaseFirestore.instance
+    final peers = await FirebaseFirestore.instance
         .collection(
           collectionVideoCall,
         )
@@ -121,12 +120,11 @@ class Signaling {
           'uuid',
           isNotEqualTo: localUuid, // exclude my self
         )
-        .snapshots()
-        .listen(
-          (snapshot) => snapshot.docs.forEach(
-            (peer) => _newPeerJoin(peer.data()),
-          ),
-        );
+        .get();
+
+    for (final peer in peers.docs) {
+      await _connectTo(peer.data(), true);
+    }
 
     // WebRTC connection params for me
     listenerConnectionParams = FirebaseFirestore.instance
@@ -146,101 +144,81 @@ class Signaling {
 
     // add my self to peers list
     await _writePeer({
-      'dest': 'all',
       'uuid': localUuid,
       'displayName': localDisplayName,
     });
   }
 
-  Future<void> _newPeerJoin(Map<String, dynamic> receivedMsg) async {
-    final String uuid = receivedMsg['uuid'];
-    final String dest = receivedMsg['dest'];
+  Future<void> _connectTo(Map<String, dynamic> receivedMsg, bool startOffer) async {
+    final String fromPeerId = receivedMsg['uuid'];
 
-    /*
-    localUuid = A & dest = All & uuid = B
-      => peerConnections[B] = new PC
-      => request an offer from the new comer(dest = B, uuid = A)
+    if (peerConnections.containsKey(fromPeerId)) {
+      if (kDebugMode) {
+        print('Peer $fromPeerId already exists!');
+      }
+    } else {
+      // set up peer connection object for a newcomer peer
+      if (kDebugMode) {
+        print('_newPeer: $fromPeerId');
+      }
 
-    localUuid = B & dest = B & uuid = A
-      => peerConnections[A] = new PC
-      => request an offer from the new comer(dest = A, uuid = B)
+      final pc = await createPeerConnection(iceServers);
 
-    localUuid = A & dest = A & uuid = B
-      => peerConnections[A] = new PC
-      => request an offer from the new comer
+      peerConnections.putIfAbsent(fromPeerId, () => pc);
 
-    */
+      pc.onIceCandidate = (event) => _gotIceCandidate(event, fromPeerId);
+      pc.onTrack = (event) => _gotRemoteStream(event, fromPeerId);
+      pc.onIceConnectionState = (event) => _checkPeerDisconnect(event, fromPeerId);
 
-    // Ignore messages that are not for us
-    if ('all' == dest) {
-      if (peerConnections.containsKey(uuid)) {
-        throw Exception('Peer $uuid already exists!');
-      } else {
-        // set up peer connection object for a newcomer peer
+      pc.addStream(localStream!);
+
+      if (startOffer) {
         if (kDebugMode) {
-          print('_newPeer: $uuid');
+          print('createOffer from $localUuid to $fromPeerId');
         }
 
-        final pc = await createPeerConnection(iceServers);
-
-        peerConnections.putIfAbsent(uuid, () => pc);
-
-        pc.onIceCandidate = (event) => _gotIceCandidate(event, uuid);
-        pc.onTrack = (event) => _gotRemoteStream(event, uuid);
-        pc.onIceConnectionState = (event) => _checkPeerDisconnect(event, uuid);
-
-        pc.addStream(localStream!);
-
-        // request an offer from the new comer
-        await _writePeer({
-          'dest': uuid,
-          'uuid': localUuid,
-          'displayName': localDisplayName,
-        });
-      }
-    } else if (localUuid == dest) {
-      if (peerConnections.containsKey(uuid)) {
-        // initiate call if we are the newcomer peer
-        final pc = peerConnections[uuid]!;
-
-        await _createdDescription(pc, await pc.createOffer(), uuid);
-      } else {
-        throw Exception('Peer $uuid not exists!');
+        await _createdDescription(pc, await pc.createOffer(), fromPeerId);
       }
     }
   }
 
   Future<void> _receivedConnectionParams(Map<String, dynamic> receivedMsg) async {
-    final String uuid = receivedMsg['uuid'];
-    final ice = receivedMsg['ice'];
-    final sdp = receivedMsg['sdp'];
+    final String fromPeerId = receivedMsg['uuid'];
 
-    if (peerConnections.containsKey(uuid)) {
-      final pc = peerConnections[uuid]!;
+    if (!peerConnections.containsKey(fromPeerId)) {
+      await _connectTo(receivedMsg, false);
+    }
 
-      if (sdp != null) {
-        await pc.setRemoteDescription(RTCSessionDescription(sdp['sdp'], sdp['type']));
+    final pc = peerConnections[fromPeerId]!;
 
-        // Only create answers in response to offers
-        if ('offer' == sdp['type']) {
-          await _createdDescription(pc, await pc.createAnswer(), uuid);
+    if (receivedMsg.containsKey('sdp')) {
+      final sdp = receivedMsg['sdp'];
+
+      await pc.setRemoteDescription(RTCSessionDescription(sdp['sdp'], sdp['type']));
+
+      // Only create answers in response to offers
+      if ('offer' == sdp['type']) {
+        if (kDebugMode) {
+          print('createAnswer from $localUuid to $fromPeerId');
         }
-      } else if (ice != null) {
-        await pc.addCandidate(RTCIceCandidate(ice['candidate'], ice['sdpMid'], ice['sdpMLineIndex']));
+
+        await _createdDescription(pc, await pc.createAnswer(), fromPeerId);
       }
-    } else {
-      throw Exception('Peer $uuid not exists!');
+    } else if (receivedMsg.containsKey('ice')) {
+      final ice = receivedMsg['ice'];
+
+      await pc.addCandidate(RTCIceCandidate(ice['candidate'], ice['sdpMid'], ice['sdpMLineIndex']));
     }
   }
 
-  Future<void> _createdDescription(RTCPeerConnection pc, RTCSessionDescription description, String peerUuid) async {
+  Future<void> _createdDescription(RTCPeerConnection pc, RTCSessionDescription description, String destinationPeerId) async {
     if (kDebugMode) {
-      print('got description, peer $peerUuid');
+      print('got description, peer $destinationPeerId');
     }
 
     await pc.setLocalDescription(description);
 
-    await _writeParamsToDb(peerUuid, {
+    await _writeParamsToDb(destinationPeerId, {
       'uuid': localUuid,
       'sdp': description.toMap(),
     });
