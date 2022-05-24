@@ -11,7 +11,7 @@ typedef StreamStateCallback = void Function(String peerUuid, MediaStream stream)
 typedef ConnectionClosedCallback = RTCVideoRenderer Function();
 
 class Signaling {
-  MediaStream? localStream;
+  MediaStream? localStream, shareStream;
   StreamStateCallback? onAddRemoteStream, onAddLocalStream;
   StringCallback? onRemoveRemoteStream;
 
@@ -90,30 +90,27 @@ class Signaling {
     return true;
   }
 
-  bool _isScreenSharing = false;
-
   bool isScreenSharing() {
-    return _isScreenSharing;
+    return shareStream != null;
+  }
+
+  void stopScreenSharing() {
+    shareStream?.getTracks().forEach((track) => track.stop());
+    shareStream?.dispose();
+    shareStream = null;
+
+    _replaceStream(localStream!);
   }
 
   Future<void> screenSharing() async {
-    final share = await navigator.mediaDevices.getDisplayMedia({'cursor': true});
-    final track = share.getTracks()[1];
+    shareStream = await navigator.mediaDevices.getDisplayMedia({
+      'audio': false,
+      'video': {
+        'cursor': 'always',
+      },
+    });
 
-    if ('video' == track.kind) {
-      final pc = peerConnections[localUuid]!;
-      final senders = await pc.getSenders();
-
-      for (final s in senders) {
-        if ('video' == s.track?.kind) {
-          await s.replaceTrack(track);
-        }
-      }
-
-      _isScreenSharing = !_isScreenSharing;
-    } else {
-      print('Cannot access screen sharing!');
-    }
+    _replaceStream(shareStream!);
   }
 
   void muteMic() {
@@ -130,29 +127,22 @@ class Signaling {
   Future<void> hangUp(RTCVideoRenderer localVideo) async {
     listenerConnectionParams?.cancel();
 
+    stopScreenSharing();
+
     localVideo.srcObject = null;
 
     localStream?.getTracks().forEach((track) => track.stop());
     localStream?.dispose();
     localStream = null;
 
-    peerConnections.forEach((uuid, pc) => pc.close());
+    for (final pc in peerConnections.values) {
+      pc.close();
+      pc.dispose();
+    }
 
-    // remove me from peers
-    await FirebaseFirestore.instance
-        .collection(collectionVideoCall)
-        .doc(appointmentId)
-        .collection(tablePeers)
-        .where(
-          'uuid',
-          isEqualTo: localUuid,
-        )
-        .get()
-        .then(
-          (snapshot) => snapshot.docs.forEach(
-            (peer) async => await peer.reference.delete(),
-          ),
-        );
+    peerConnections.clear();
+
+    await _clearAllFirebaseData();
   }
 
   Future<void> join() async {
@@ -338,5 +328,60 @@ class Signaling {
         .doc(appointmentId)
         .collection(tablePeers)
         .add(msg);
+  }
+
+  Future<void> _clearAllFirebaseData() async {
+    // remove me from peers
+    await FirebaseFirestore.instance
+        .collection(collectionVideoCall)
+        .doc(appointmentId)
+        .collection(tablePeers)
+        .where(
+          'uuid',
+          isEqualTo: localUuid,
+        )
+        .get()
+        .then(
+          (snapshot) => snapshot.docs.forEach(
+            (peer) async => await peer.reference.delete(),
+          ),
+        );
+
+    // remove all params for me
+    await FirebaseFirestore.instance
+        .collection(
+          collectionVideoCall,
+        )
+        .doc(appointmentId)
+        .collection(tableConnectionParamsFor)
+        .doc(localUuid)
+        .collection(tableConnectionParams)
+        .get()
+        .then(
+          (snapshot) => snapshot.docs.forEach(
+            (peer) async => await peer.reference.delete(),
+          ),
+        );
+  }
+
+  Future<void> _replaceStream(MediaStream stream) async {
+    final tracks = stream.getTracks();
+
+    final track = tracks.firstWhere(
+      (t) => 'video' == t.kind,
+      orElse: () => tracks.first,
+    );
+
+    for (final pc in peerConnections.values) {
+      final senders = await pc.getSenders();
+
+      for (final s in senders) {
+        if ('video' == s.track?.kind) {
+          await s.replaceTrack(track);
+        }
+      }
+    }
+
+    onAddLocalStream?.call(localUuid, stream);
   }
 }

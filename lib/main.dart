@@ -33,22 +33,16 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
+  final signaling = Signaling();
+
   final localRenderer = RTCVideoRenderer();
   final Map<String, RTCVideoRenderer> remoteRenderers = {};
-
-  final signaling = Signaling();
 
   bool localRendererInitialized = false;
 
   @override
   void initState() {
     super.initState();
-
-    signaling.onRemoveRemoteStream = (peerUuid) {
-      remoteRenderers[peerUuid]!.srcObject = null;
-      remoteRenderers[peerUuid]!.dispose();
-      remoteRenderers.remove(peerUuid);
-    };
 
     signaling.onAddLocalStream = (peerUuid, stream) async {
       if (!localRendererInitialized) {
@@ -66,19 +60,32 @@ class _MyHomePageState extends State<MyHomePage> {
 
       setState(() => remoteRenderers.putIfAbsent(peerUuid, () => remoteRenderer));
     };
+
+    signaling.onRemoveRemoteStream = (peerUuid) {
+      if (remoteRenderers.containsKey(peerUuid)) {
+        remoteRenderers[peerUuid]!.srcObject = null;
+        remoteRenderers[peerUuid]!.dispose();
+
+        setState(() => remoteRenderers.remove(peerUuid));
+      }
+    };
   }
 
   @override
   void dispose() {
     localRenderer.dispose();
 
+    disposeRemoteRenderers();
+
+    super.dispose();
+  }
+
+  void disposeRemoteRenderers() {
     for (final remoteRenderer in remoteRenderers.values) {
       remoteRenderer.dispose();
     }
 
     remoteRenderers.clear();
-
-    super.dispose();
   }
 
   Flex view({required List<Widget> children}) {
@@ -86,15 +93,10 @@ class _MyHomePageState extends State<MyHomePage> {
     return isLandscape ? Row(children: children) : Column(children: children);
   }
 
-  void _hangUp() {
+  void hangUp() {
     setState(() {
       signaling.hangUp(localRenderer);
-
-      for (final remoteRenderer in remoteRenderers.values) {
-        remoteRenderer.dispose();
-      }
-
-      remoteRenderers.clear();
+      disposeRemoteRenderers();
     });
   }
 
@@ -118,11 +120,19 @@ class _MyHomePageState extends State<MyHomePage> {
               ),
             ] else ...[
               FloatingActionButton(
-                tooltip: signaling.isScreenSharing() ? 'Stop screen sharing' : 'Start screen sharing',
-                backgroundColor: signaling.isScreenSharing() ? Colors.redAccent : Colors.amber,
-                child: signaling.isScreenSharing() ? const Icon(Icons.stop_screen_share_outlined) : const Icon(Icons.screen_share_outlined),
+                tooltip: signaling.isScreenSharing() ? 'Change screen sharing' : 'Start screen sharing',
+                backgroundColor: Colors.amber,
+                child: const Icon(Icons.screen_share_outlined),
                 onPressed: () => signaling.screenSharing(),
               ),
+              if (signaling.isScreenSharing()) ...[
+                FloatingActionButton(
+                  tooltip: 'Stop screen sharing',
+                  backgroundColor: Colors.redAccent,
+                  child: const Icon(Icons.stop_screen_share_outlined),
+                  onPressed: () => signaling.stopScreenSharing(),
+                ),
+              ],
               if (cameraCountSnap.hasData && cameraCountSnap.requireData > 1) ...[
                 FloatingActionButton(
                   tooltip: 'Switch camera',
@@ -141,7 +151,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 tooltip: 'Hangup',
                 backgroundColor: Colors.red,
                 child: const Icon(Icons.call_end),
-                onPressed: () => _hangUp(),
+                onPressed: () => hangUp(),
               ),
             ],
           ],
@@ -160,7 +170,7 @@ class _MyHomePageState extends State<MyHomePage> {
               ),
             ],
             for (final remoteRenderer in remoteRenderers.values) ...[
-              if (remoteRenderer.srcObject != null) ...[
+              if (true == remoteRenderer.srcObject?.active) ...[
                 Expanded(
                   child: Container(
                     margin: const EdgeInsets.all(8.0),
