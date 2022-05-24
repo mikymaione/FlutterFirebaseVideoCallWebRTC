@@ -38,6 +38,8 @@ class _MyHomePageState extends State<MyHomePage> {
 
   final signaling = Signaling();
 
+  bool localRendererInitialized = false;
+
   @override
   void initState() {
     super.initState();
@@ -49,7 +51,11 @@ class _MyHomePageState extends State<MyHomePage> {
     };
 
     signaling.onAddLocalStream = (peerUuid, stream) async {
-      await localRenderer.initialize();
+      if (!localRendererInitialized) {
+        await localRenderer.initialize();
+        localRendererInitialized = true;
+      }
+
       setState(() => localRenderer.srcObject = stream);
     };
 
@@ -97,41 +103,49 @@ class _MyHomePageState extends State<MyHomePage> {
     return Scaffold(
       appBar: AppBar(title: const Text("WebRTC")),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: Wrap(
-        spacing: 15,
-        children: [
-          if (!signaling.isLocalStreamOk()) ...[
-            FloatingActionButton(
-              tooltip: 'Join room',
-              child: const Icon(Icons.add_call),
-              backgroundColor: Colors.green,
-              onPressed: () => signaling.join(),
-            ),
-          ] else ...[
-            FutureBuilder<int>(
-              future: signaling.cameraCount(),
-              initialData: 0,
-              builder: (context, snap) => FloatingActionButton(
-                tooltip: 'Switch camera',
-                backgroundColor: Colors.blueGrey,
-                child: const Icon(Icons.switch_camera),
-                onPressed: (snap.data ?? 0) > 1 ? () => signaling.switchCamera() : null,
+      floatingActionButton: FutureBuilder<int>(
+        future: signaling.cameraCount(),
+        initialData: 0,
+        builder: (context, cameraCountSnap) => Wrap(
+          spacing: 15,
+          children: [
+            if (!signaling.isLocalStreamOk()) ...[
+              FloatingActionButton(
+                tooltip: 'Join room',
+                child: const Icon(Icons.add_call),
+                backgroundColor: Colors.green,
+                onPressed: () => signaling.join(),
               ),
-            ),
-            FloatingActionButton(
-              tooltip: signaling.isMicMuted() ? 'Un-mute mic' : 'Mute mic',
-              backgroundColor: Colors.brown,
-              child: signaling.isMicMuted() ? const Icon(Icons.mic_outlined) : const Icon(Icons.mic_off),
-              onPressed: () => signaling.muteMic(),
-            ),
-            FloatingActionButton(
-              tooltip: 'Hangup',
-              backgroundColor: Colors.red,
-              child: const Icon(Icons.call_end),
-              onPressed: () => _hangUp(),
-            ),
+            ] else ...[
+              FloatingActionButton(
+                tooltip: signaling.isScreenSharing() ? 'Stop screen sharing' : 'Start screen sharing',
+                backgroundColor: signaling.isScreenSharing() ? Colors.redAccent : Colors.amber,
+                child: signaling.isScreenSharing() ? const Icon(Icons.stop_screen_share_outlined) : const Icon(Icons.screen_share_outlined),
+                onPressed: () => signaling.screenSharing(),
+              ),
+              if (cameraCountSnap.hasData && cameraCountSnap.requireData > 1) ...[
+                FloatingActionButton(
+                  tooltip: 'Switch camera',
+                  backgroundColor: Colors.blueGrey,
+                  child: const Icon(Icons.switch_camera),
+                  onPressed: () => signaling.switchCamera(),
+                )
+              ],
+              FloatingActionButton(
+                tooltip: signaling.isMicMuted() ? 'Un-mute mic' : 'Mute mic',
+                backgroundColor: signaling.isMicMuted() ? Colors.brown : Colors.redAccent,
+                child: signaling.isMicMuted() ? const Icon(Icons.mic_outlined) : const Icon(Icons.mic_off),
+                onPressed: () => signaling.muteMic(),
+              ),
+              FloatingActionButton(
+                tooltip: 'Hangup',
+                backgroundColor: Colors.red,
+                child: const Icon(Icons.call_end),
+                onPressed: () => _hangUp(),
+              ),
+            ],
           ],
-        ],
+        ),
       ),
       body: Container(
         margin: const EdgeInsets.all(8.0),

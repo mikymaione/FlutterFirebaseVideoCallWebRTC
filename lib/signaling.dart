@@ -47,8 +47,19 @@ class Signaling {
   };
 
   Future<int> cameraCount() async {
-    final cams = await Helper.cameras;
-    return cams.length;
+    if (isScreenSharing()) {
+      return 0;
+    } else {
+      try {
+        final cams = await Helper.cameras;
+
+        return cams.length;
+      } catch (e) {
+        // camera not accessibile, like for screen sharing or other problems
+        print('Error: $e');
+        return 0;
+      }
+    }
   }
 
   bool isLocalStreamOk() {
@@ -67,15 +78,52 @@ class Signaling {
 
   bool isMicEnabled() {
     if (localStream != null) {
-      return localStream!.getAudioTracks()[0].enabled;
+      try {
+        return localStream!.getAudioTracks()[0].enabled;
+      } catch (e) {
+        // no audio
+        print('Error: $e');
+        return false;
+      }
     }
 
     return true;
   }
 
+  bool _isScreenSharing = false;
+
+  bool isScreenSharing() {
+    return _isScreenSharing;
+  }
+
+  Future<void> screenSharing() async {
+    final share = await navigator.mediaDevices.getDisplayMedia({'cursor': true});
+    final track = share.getTracks()[1];
+
+    if ('video' == track.kind) {
+      final pc = peerConnections[localUuid]!;
+      final senders = await pc.getSenders();
+
+      for (final s in senders) {
+        if ('video' == s.track?.kind) {
+          await s.replaceTrack(track);
+        }
+      }
+
+      _isScreenSharing = !_isScreenSharing;
+    } else {
+      print('Cannot access screen sharing!');
+    }
+  }
+
   void muteMic() {
     if (localStream != null) {
-      localStream!.getAudioTracks()[0].enabled = !isMicEnabled();
+      try {
+        localStream!.getAudioTracks()[0].enabled = !isMicEnabled();
+      } catch (e) {
+        //cannot change
+        print('Error: $e');
+      }
     }
   }
 
