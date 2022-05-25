@@ -26,7 +26,7 @@ class Signaling {
   final localUuid = const Uuid().v1();
   final localDisplayName = getRandomString(20);
 
-  final appointmentId = 'UoCaFPedwvAKZPFdmaqc';
+  String? appointmentId;
 
   StreamSubscription? listenerConnectionParams;
 
@@ -53,7 +53,7 @@ class Signaling {
       try {
         final cams = await Helper.cameras;
 
-        return cams.length;
+        return kIsWeb ? min(cams.length, 1) : cams.length;
       } catch (e) {
         // camera not accessibile, like for screen sharing or other problems
         print('Error: $e');
@@ -66,9 +66,9 @@ class Signaling {
     return localStream != null;
   }
 
-  void switchCamera() {
-    if (localStream != null) {
-      Helper.switchCamera(localStream!.getVideoTracks()[0]);
+  Future<void> switchCamera() async {
+    if (!kIsWeb && localStream != null) {
+      await Helper.switchCamera(localStream!.getVideoTracks().first);
     }
   }
 
@@ -79,7 +79,7 @@ class Signaling {
   bool isMicEnabled() {
     if (localStream != null) {
       try {
-        return localStream!.getAudioTracks()[0].enabled;
+        return localStream!.getAudioTracks().first.enabled;
       } catch (e) {
         // no audio
         print('Error: $e');
@@ -125,6 +125,8 @@ class Signaling {
   }
 
   Future<void> hangUp(RTCVideoRenderer localVideo) async {
+    appointmentId = null;
+
     listenerConnectionParams?.cancel();
 
     stopScreenSharing();
@@ -145,7 +147,9 @@ class Signaling {
     await _clearAllFirebaseData();
   }
 
-  Future<void> join() async {
+  Future<void> join(String _appointmentId) async {
+    appointmentId = _appointmentId;
+
     await _openUserMedia();
 
     final peers = await FirebaseFirestore.instance
@@ -305,6 +309,12 @@ class Signaling {
 
   Future<void> _openUserMedia() async {
     localStream = await navigator.mediaDevices.getUserMedia({'video': true, 'audio': true});
+
+    if (kDebugMode) {
+      print('Video tracks: ${localStream?.getVideoTracks().length}');
+      print('Audio tracks: ${localStream?.getAudioTracks().length}');
+    }
+
     onAddLocalStream?.call(localUuid, localStream!);
   }
 
@@ -365,12 +375,7 @@ class Signaling {
   }
 
   Future<void> _replaceStream(MediaStream stream) async {
-    final tracks = stream.getTracks();
-
-    final track = tracks.firstWhere(
-      (t) => 'video' == t.kind,
-      orElse: () => tracks.first,
-    );
+    final track = stream.getVideoTracks().first;
 
     for (final pc in peerConnections.values) {
       final senders = await pc.getSenders();
@@ -380,6 +385,11 @@ class Signaling {
           await s.replaceTrack(track);
         }
       }
+    }
+
+    if (kDebugMode) {
+      print('Video tracks: ${stream.getVideoTracks().length}');
+      print('Audio tracks: ${stream.getAudioTracks().length}');
     }
 
     onAddLocalStream?.call(localUuid, stream);

@@ -33,6 +33,7 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
+  final textEditingController = TextEditingController(text: '');
   final signaling = Signaling();
 
   final localRenderer = RTCVideoRenderer();
@@ -73,6 +74,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   @override
   void dispose() {
+    textEditingController.dispose();
     localRenderer.dispose();
 
     disposeRemoteRenderers();
@@ -95,6 +97,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   void hangUp() {
     setState(() {
+      textEditingController.text = '';
       signaling.hangUp(localRenderer);
       disposeRemoteRenderers();
     });
@@ -116,12 +119,12 @@ class _MyHomePageState extends State<MyHomePage> {
                 tooltip: 'Join room',
                 child: const Icon(Icons.add_call),
                 backgroundColor: Colors.green,
-                onPressed: () => signaling.join(),
+                onPressed: () => signaling.join(textEditingController.text),
               ),
             ] else ...[
               FloatingActionButton(
                 tooltip: signaling.isScreenSharing() ? 'Change screen sharing' : 'Start screen sharing',
-                backgroundColor: Colors.amber,
+                backgroundColor: signaling.isScreenSharing() ? Colors.amber : Colors.grey,
                 child: const Icon(Icons.screen_share_outlined),
                 onPressed: () => signaling.screenSharing(),
               ),
@@ -136,16 +139,16 @@ class _MyHomePageState extends State<MyHomePage> {
               if (cameraCountSnap.hasData && cameraCountSnap.requireData > 1) ...[
                 FloatingActionButton(
                   tooltip: 'Switch camera',
-                  backgroundColor: Colors.blueGrey,
+                  backgroundColor: Colors.grey,
                   child: const Icon(Icons.switch_camera),
                   onPressed: () => signaling.switchCamera(),
                 )
               ],
               FloatingActionButton(
                 tooltip: signaling.isMicMuted() ? 'Un-mute mic' : 'Mute mic',
-                backgroundColor: signaling.isMicMuted() ? Colors.brown : Colors.redAccent,
-                child: signaling.isMicMuted() ? const Icon(Icons.mic_outlined) : const Icon(Icons.mic_off),
-                onPressed: () => signaling.muteMic(),
+                backgroundColor: signaling.isMicMuted() ? Colors.redAccent : Colors.grey,
+                child: signaling.isMicMuted() ? const Icon(Icons.mic_off) : const Icon(Icons.mic_outlined),
+                onPressed: () => setState(() => signaling.muteMic()),
               ),
               FloatingActionButton(
                 tooltip: 'Hangup',
@@ -159,26 +162,49 @@ class _MyHomePageState extends State<MyHomePage> {
       ),
       body: Container(
         margin: const EdgeInsets.all(8.0),
-        child: view(
+        child: Column(
           children: [
-            if (localRenderer.srcObject != null) ...[
-              Expanded(
-                child: Container(
-                  margin: const EdgeInsets.all(8.0),
-                  child: RTCVideoView(localRenderer, mirror: true),
-                ),
+            // room
+            Container(
+              margin: const EdgeInsets.all(8.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text("Room ID: "),
+                  Flexible(
+                    child: TextFormField(
+                      controller: textEditingController,
+                    ),
+                  )
+                ],
               ),
-            ],
-            for (final remoteRenderer in remoteRenderers.values) ...[
-              if (true == remoteRenderer.srcObject?.active) ...[
-                Expanded(
-                  child: Container(
-                    margin: const EdgeInsets.all(8.0),
-                    child: RTCVideoView(remoteRenderer),
-                  ),
-                ),
-              ],
-            ],
+            ),
+
+            // streaming
+            Expanded(
+              child: view(
+                children: [
+                  if (localRenderer.srcObject != null) ...[
+                    Expanded(
+                      child: Container(
+                        margin: const EdgeInsets.all(8.0),
+                        child: RTCVideoView(localRenderer, mirror: !signaling.isScreenSharing()),
+                      ),
+                    ),
+                  ],
+                  for (final remoteRenderer in remoteRenderers.values) ...[
+                    if (true == remoteRenderer.srcObject?.active) ...[
+                      Expanded(
+                        child: Container(
+                          margin: const EdgeInsets.all(8.0),
+                          child: RTCVideoView(remoteRenderer),
+                        ),
+                      ),
+                    ],
+                  ],
+                ],
+              ),
+            ),
           ],
         ),
       ),

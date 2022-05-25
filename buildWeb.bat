@@ -1,0 +1,1 @@
+flutter build web --base-href "/webrtc.github.io/"
