@@ -206,7 +206,9 @@ class Signaling {
       pc.onTrack = (event) => _gotRemoteStream(event, fromPeerId);
       pc.onIceConnectionState = (event) => _checkConnectionState(event, fromPeerId);
 
-      pc.addStream(localStream!);
+      // deprecated -> Safari error
+      //pc.addStream(localStream!);
+      localStream!.getTracks().forEach((track) => pc.addTrack(track, localStream!));
 
       if (startOffer) {
         if (kDebugMode) {
