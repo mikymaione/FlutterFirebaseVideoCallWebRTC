@@ -13,7 +13,7 @@ typedef ConnectionClosedCallback = RTCVideoRenderer Function();
 class Signaling {
   MediaStream? localStream, shareStream;
   StreamStateCallback? onAddRemoteStream, onAddLocalStream;
-  StringCallback? onRemoveRemoteStream;
+  StringCallback? onRemoveRemoteStream, onConnectionLoading, onConnectionConnected, onConnectionError;
 
   // key is uuid, values are peer connection object and user defined display name string
   final Map<String, RTCPeerConnection> peerConnections = {};
@@ -23,10 +23,7 @@ class Signaling {
   static const tableConnectionParamsFor = 'connectionParamsFor';
   static const tablePeers = 'peers';
 
-  final localUuid = const Uuid().v1();
-  final localDisplayName = getRandomString(20);
-
-  String? appointmentId;
+  String? localUuid, localDisplayName, appointmentId;
 
   StreamSubscription? listenerConnectionParams;
 
@@ -115,12 +112,7 @@ class Signaling {
 
   void muteMic() {
     if (localStream != null) {
-      try {
-        localStream!.getAudioTracks()[0].enabled = !isMicEnabled();
-      } catch (e) {
-        //cannot change
-        print('Error: $e');
-      }
+      localStream!.getAudioTracks()[0].enabled = !isMicEnabled();
     }
   }
 
@@ -149,6 +141,8 @@ class Signaling {
 
   Future<void> join(String _appointmentId) async {
     appointmentId = _appointmentId;
+    localUuid = const Uuid().v1();
+    localDisplayName = getRandomString(20);
 
     await _openUserMedia();
 
@@ -210,7 +204,7 @@ class Signaling {
 
       pc.onIceCandidate = (event) => _gotIceCandidate(event, fromPeerId);
       pc.onTrack = (event) => _gotRemoteStream(event, fromPeerId);
-      pc.onIceConnectionState = (event) => _checkPeerDisconnect(event, fromPeerId);
+      pc.onIceConnectionState = (event) => _checkConnectionState(event, fromPeerId);
 
       pc.addStream(localStream!);
 
@@ -266,7 +260,7 @@ class Signaling {
     });
   }
 
-  void _checkPeerDisconnect(RTCIceConnectionState event, String peerUuid) {
+  void _checkConnectionState(RTCIceConnectionState event, String peerUuid) {
     final state = peerConnections[peerUuid]?.iceConnectionState;
 
     if (kDebugMode) {
@@ -274,7 +268,20 @@ class Signaling {
     }
 
     switch (state) {
+      case RTCIceConnectionState.RTCIceConnectionStateNew:
+      case RTCIceConnectionState.RTCIceConnectionStateChecking:
+        onConnectionLoading?.call(peerUuid);
+        break;
+
+      case RTCIceConnectionState.RTCIceConnectionStateConnected:
+      case RTCIceConnectionState.RTCIceConnectionStateCompleted:
+        onConnectionConnected?.call(peerUuid);
+        break;
+
       case RTCIceConnectionState.RTCIceConnectionStateFailed:
+        onConnectionError?.call(peerUuid);
+        break;
+
       case RTCIceConnectionState.RTCIceConnectionStateDisconnected:
       case RTCIceConnectionState.RTCIceConnectionStateClosed:
         peerConnections.remove(peerUuid);
@@ -315,7 +322,7 @@ class Signaling {
       print('Audio tracks: ${localStream?.getAudioTracks().length}');
     }
 
-    onAddLocalStream?.call(localUuid, localStream!);
+    onAddLocalStream?.call(localUuid!, localStream!);
   }
 
   Future<void> _writeParamsToDb(String dest, Map<String, dynamic> msg) async {
@@ -392,6 +399,6 @@ class Signaling {
       print('Audio tracks: ${stream.getAudioTracks().length}');
     }
 
-    onAddLocalStream?.call(localUuid, stream);
+    onAddLocalStream?.call(localUuid!, stream);
   }
 }

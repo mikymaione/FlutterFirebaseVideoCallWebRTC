@@ -2,7 +2,11 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_firebase_video_call_webrtc/firebase_options.dart';
 import 'package:flutter_firebase_video_call_webrtc/signaling.dart';
+import 'package:flutter_firebase_video_call_webrtc/snack_msg.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
+
+typedef ExecuteCallback = void Function();
+typedef ExecuteFutureCallback = Future<void> Function();
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -33,12 +37,13 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  final textEditingController = TextEditingController(text: '');
   final signaling = Signaling();
 
   final localRenderer = RTCVideoRenderer();
   final Map<String, RTCVideoRenderer> remoteRenderers = {};
+  final Map<String, bool?> remoteRenderersLoading = {};
 
+  String roomId = '';
   bool localRendererInitialized = false;
 
   @override
@@ -59,7 +64,7 @@ class _MyHomePageState extends State<MyHomePage> {
       await remoteRenderer.initialize();
       remoteRenderer.srcObject = stream;
 
-      setState(() => remoteRenderers.putIfAbsent(peerUuid, () => remoteRenderer));
+      setState(() => remoteRenderers[peerUuid] = remoteRenderer);
     };
 
     signaling.onRemoveRemoteStream = (peerUuid) {
@@ -67,14 +72,28 @@ class _MyHomePageState extends State<MyHomePage> {
         remoteRenderers[peerUuid]!.srcObject = null;
         remoteRenderers[peerUuid]!.dispose();
 
-        setState(() => remoteRenderers.remove(peerUuid));
+        setState(() {
+          remoteRenderers.remove(peerUuid);
+          remoteRenderersLoading.remove(peerUuid);
+        });
       }
+    };
+
+    signaling.onConnectionConnected = (peerUuid) {
+      setState(() => remoteRenderersLoading[peerUuid] = false);
+    };
+
+    signaling.onConnectionLoading = (peerUuid) {
+      setState(() => remoteRenderersLoading[peerUuid] = true);
+    };
+
+    signaling.onConnectionError = (peerUuid) {
+      SnackMsg.showError(context, 'Connection failed with $peerUuid');
     };
   }
 
   @override
   void dispose() {
-    textEditingController.dispose();
     localRenderer.dispose();
 
     disposeRemoteRenderers();
@@ -95,10 +114,22 @@ class _MyHomePageState extends State<MyHomePage> {
     return isLandscape ? Row(children: children) : Column(children: children);
   }
 
+  Future<void> doTry({ExecuteCallback? runSync, ExecuteFutureCallback? runAsync, ExecuteCallback? onError}) async {
+    try {
+      runSync?.call();
+      await runAsync?.call();
+    } catch (e) {
+      SnackMsg.showError(context, 'Error: $e');
+      onError?.call();
+    }
+  }
+
   void hangUp() {
     setState(() {
-      textEditingController.text = '';
+      roomId = '';
+
       signaling.hangUp(localRenderer);
+
       disposeRemoteRenderers();
     });
   }
@@ -114,48 +145,59 @@ class _MyHomePageState extends State<MyHomePage> {
         builder: (context, cameraCountSnap) => Wrap(
           spacing: 15,
           children: [
-            if (!signaling.isLocalStreamOk()) ...[
-              FloatingActionButton(
-                tooltip: 'Join room',
-                child: const Icon(Icons.add_call),
-                backgroundColor: Colors.green,
-                onPressed: () => signaling.join(textEditingController.text),
-              ),
-            ] else ...[
-              FloatingActionButton(
-                tooltip: signaling.isScreenSharing() ? 'Change screen sharing' : 'Start screen sharing',
-                backgroundColor: signaling.isScreenSharing() ? Colors.amber : Colors.grey,
-                child: const Icon(Icons.screen_share_outlined),
-                onPressed: () => signaling.screenSharing(),
-              ),
-              if (signaling.isScreenSharing()) ...[
+            if (roomId.length > 2) ...[
+              if (!signaling.isLocalStreamOk()) ...[
                 FloatingActionButton(
-                  tooltip: 'Stop screen sharing',
-                  backgroundColor: Colors.redAccent,
-                  child: const Icon(Icons.stop_screen_share_outlined),
-                  onPressed: () => signaling.stopScreenSharing(),
+                  tooltip: 'Join room',
+                  child: const Icon(Icons.add_call),
+                  backgroundColor: Colors.green,
+                  onPressed: () async => await doTry(
+                    runAsync: () => signaling.join(roomId),
+                    onError: () => signaling.hangUp(localRenderer),
+                  ),
+                ),
+              ] else ...[
+                FloatingActionButton(
+                  tooltip: signaling.isScreenSharing() ? 'Change screen sharing' : 'Start screen sharing',
+                  backgroundColor: signaling.isScreenSharing() ? Colors.amber : Colors.grey,
+                  child: const Icon(Icons.screen_share_outlined),
+                  onPressed: () async => await doTry(
+                    runAsync: () => signaling.screenSharing(),
+                  ),
+                ),
+                if (signaling.isScreenSharing()) ...[
+                  FloatingActionButton(
+                    tooltip: 'Stop screen sharing',
+                    backgroundColor: Colors.redAccent,
+                    child: const Icon(Icons.stop_screen_share_outlined),
+                    onPressed: () => signaling.stopScreenSharing(),
+                  ),
+                ],
+                if (cameraCountSnap.hasData && cameraCountSnap.requireData > 1) ...[
+                  FloatingActionButton(
+                    tooltip: 'Switch camera',
+                    backgroundColor: Colors.grey,
+                    child: const Icon(Icons.switch_camera),
+                    onPressed: () async => await doTry(
+                      runAsync: () => signaling.switchCamera(),
+                    ),
+                  )
+                ],
+                FloatingActionButton(
+                  tooltip: signaling.isMicMuted() ? 'Un-mute mic' : 'Mute mic',
+                  backgroundColor: signaling.isMicMuted() ? Colors.redAccent : Colors.grey,
+                  child: signaling.isMicMuted() ? const Icon(Icons.mic_off) : const Icon(Icons.mic_outlined),
+                  onPressed: () => doTry(
+                    runSync: () => setState(() => signaling.muteMic()),
+                  ),
+                ),
+                FloatingActionButton(
+                  tooltip: 'Hangup',
+                  backgroundColor: Colors.red,
+                  child: const Icon(Icons.call_end),
+                  onPressed: () => hangUp(),
                 ),
               ],
-              if (cameraCountSnap.hasData && cameraCountSnap.requireData > 1) ...[
-                FloatingActionButton(
-                  tooltip: 'Switch camera',
-                  backgroundColor: Colors.grey,
-                  child: const Icon(Icons.switch_camera),
-                  onPressed: () => signaling.switchCamera(),
-                )
-              ],
-              FloatingActionButton(
-                tooltip: signaling.isMicMuted() ? 'Un-mute mic' : 'Mute mic',
-                backgroundColor: signaling.isMicMuted() ? Colors.redAccent : Colors.grey,
-                child: signaling.isMicMuted() ? const Icon(Icons.mic_off) : const Icon(Icons.mic_outlined),
-                onPressed: () => setState(() => signaling.muteMic()),
-              ),
-              FloatingActionButton(
-                tooltip: 'Hangup',
-                backgroundColor: Colors.red,
-                child: const Icon(Icons.call_end),
-                onPressed: () => hangUp(),
-              ),
             ],
           ],
         ),
@@ -173,7 +215,8 @@ class _MyHomePageState extends State<MyHomePage> {
                   const Text("Room ID: "),
                   Flexible(
                     child: TextFormField(
-                      controller: textEditingController,
+                      initialValue: roomId,
+                      onChanged: (value) => setState(() => roomId = value),
                     ),
                   )
                 ],
@@ -187,20 +230,34 @@ class _MyHomePageState extends State<MyHomePage> {
                   if (localRenderer.srcObject != null) ...[
                     Expanded(
                       child: Container(
-                        margin: const EdgeInsets.all(8.0),
+                        margin: const EdgeInsets.all(4),
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: const Color(0XFF2493FB),
+                          ),
+                        ),
                         child: RTCVideoView(localRenderer, mirror: !signaling.isScreenSharing()),
                       ),
                     ),
                   ],
-                  for (final remoteRenderer in remoteRenderers.values) ...[
-                    if (true == remoteRenderer.srcObject?.active) ...[
-                      Expanded(
-                        child: Container(
-                          margin: const EdgeInsets.all(8.0),
-                          child: RTCVideoView(remoteRenderer),
+                  for (final remoteRenderer in remoteRenderers.entries) ...[
+                    Expanded(
+                      child: Container(
+                        margin: const EdgeInsets.all(4),
+                        padding: const EdgeInsets.all(4),
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                            color: const Color(0XFF2493FB),
+                          ),
                         ),
+                        child: false == remoteRenderersLoading[remoteRenderer.key] // && true == remoteRenderer.value.srcObject?.active
+                            ? RTCVideoView(remoteRenderer.value)
+                            : const Center(
+                                child: CircularProgressIndicator(),
+                              ),
                       ),
-                    ],
+                    ),
                   ],
                 ],
               ),
