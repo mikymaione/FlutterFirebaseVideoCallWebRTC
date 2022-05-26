@@ -143,12 +143,8 @@ class _MyHomePageState extends State<MyHomePage> {
     await signaling.join(roomId);
   }
 
-  void hangUp(bool clearRoom) {
+  void hangUp() {
     setState(() {
-      if (clearRoom) {
-        roomId = '';
-      }
-
       error = false;
 
       signaling.hangUp(localRenderer);
@@ -185,7 +181,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   backgroundColor: Colors.green,
                   onPressed: () async => await doTry(
                     runAsync: () => join(),
-                    onError: () => hangUp(false),
+                    onError: () => hangUp(),
                   ),
                 ),
               ],
@@ -196,7 +192,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   backgroundColor: Colors.green,
                   onPressed: () async => await doTry(
                     runAsync: () => join(),
-                    onError: () => hangUp(false),
+                    onError: () => hangUp(),
                   ),
                 ),
               ] else ...[
@@ -238,7 +234,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   tooltip: 'Hangup',
                   backgroundColor: Colors.red,
                   child: const Icon(Icons.call_end),
-                  onPressed: () => hangUp(true),
+                  onPressed: () => hangUp(),
                 ),
               ],
             ],
