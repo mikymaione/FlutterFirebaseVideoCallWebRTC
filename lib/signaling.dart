@@ -62,6 +62,10 @@ class Signaling {
     }
   }
 
+  bool isJoined() {
+    return _appointmentId != null;
+  }
+
   bool isLocalStreamOk() {
     return _localStream != null;
   }
@@ -113,7 +117,7 @@ class Signaling {
     }
   }
 
-  Future<void> hangUp(RTCVideoRenderer localVideo) async {
+  Future<void> hangUp(RTCVideoRenderer? localVideo) async {
     _appointmentId = null;
 
     _listenerSdp?.cancel();
@@ -124,15 +128,17 @@ class Signaling {
 
     stopScreenSharing();
 
-    localVideo.srcObject = null;
+    if (localVideo != null) {
+      localVideo.srcObject = null;
 
-    if (_localStream != null) {
-      for (final track in _localStream!.getTracks()) {
-        await track.stop();
+      if (_localStream != null) {
+        for (final track in _localStream!.getTracks()) {
+          await track.stop();
+        }
+
+        await _localStream!.dispose();
+        _localStream = null;
       }
-
-      await _localStream!.dispose();
-      _localStream = null;
     }
 
     for (final pc in _peerConnections.values) {
@@ -149,7 +155,9 @@ class Signaling {
     _appointmentId = appointmentId;
     _localUuid = const Uuid().v1();
 
-    await _openUserMedia();
+    if (_localStream == null) {
+      throw Exception('You can not start a call without the webcam opened');
+    }
 
     final peers = await FirebaseFirestore.instance
         .collection(
@@ -431,7 +439,13 @@ class Signaling {
     }
   }
 
-  Future<void> _openUserMedia() async {
+  Future<void> reOpenUserMedia() async {
+    if (_localStream == null) {
+      await openUserMedia();
+    }
+  }
+
+  Future<void> openUserMedia() async {
     _localStream = await navigator.mediaDevices.getUserMedia({
       'audio': true,
       'video': {
@@ -455,7 +469,7 @@ class Signaling {
       }
     }
 
-    onAddLocalStream?.call(_localUuid!, localDisplayName, _localStream!);
+    onAddLocalStream?.call('', localDisplayName, _localStream!);
   }
 
   Future<void> _writePeer(Map<String, dynamic> msg) async {

@@ -51,19 +51,14 @@ class _MyHomePageState extends State<MyHomePage> {
   final Map<String, bool?> remoteRenderersLoading = {};
 
   String roomId = '';
-  bool localRendererInitialized = false;
+
   bool error = false;
 
   @override
   void initState() {
     super.initState();
 
-    signaling.onAddLocalStream = (peerUuid, displayName, stream) async {
-      if (!localRendererInitialized) {
-        await localRenderer.initialize();
-        localRendererInitialized = true;
-      }
-
+    signaling.onAddLocalStream = (peerUuid, displayName, stream) {
       setState(() => localRenderer.srcObject = stream);
     };
 
@@ -104,6 +99,8 @@ class _MyHomePageState extends State<MyHomePage> {
       SnackMsg.showError(context, errorText);
       error = true;
     };
+
+    initCamera();
   }
 
   @override
@@ -113,6 +110,11 @@ class _MyHomePageState extends State<MyHomePage> {
     disposeRemoteRenderers();
 
     super.dispose();
+  }
+
+  Future<void> initCamera() async {
+    await localRenderer.initialize();
+    await doTry(runAsync: () => signaling.openUserMedia());
   }
 
   void disposeRemoteRenderers() {
@@ -140,14 +142,21 @@ class _MyHomePageState extends State<MyHomePage> {
 
   Future<void> join() async {
     setState(() => error = false);
+
+    await signaling.reOpenUserMedia();
     await signaling.join(roomId);
   }
 
-  void hangUp() {
+  void hangUp(bool exit) {
     setState(() {
       error = false;
 
-      signaling.hangUp(localRenderer);
+      if (exit) {
+        roomId = '';
+        signaling.hangUp(localRenderer);
+      } else {
+        signaling.hangUp(null);
+      }
 
       disposeRemoteRenderers();
     });
@@ -173,6 +182,16 @@ class _MyHomePageState extends State<MyHomePage> {
         builder: (context, cameraCountSnap) => Wrap(
           spacing: 15,
           children: [
+            if (!signaling.isLocalStreamOk()) ...[
+              FloatingActionButton(
+                tooltip: 'Open camera',
+                backgroundColor: Colors.redAccent,
+                child: const Icon(Icons.videocam_off_outlined),
+                onPressed: () async => await doTry(
+                  runAsync: () => signaling.reOpenUserMedia(),
+                ),
+              ),
+            ],
             if (roomId.length > 2) ...[
               if (error) ...[
                 FloatingActionButton(
@@ -181,21 +200,11 @@ class _MyHomePageState extends State<MyHomePage> {
                   backgroundColor: Colors.green,
                   onPressed: () async => await doTry(
                     runAsync: () => join(),
-                    onError: () => hangUp(),
+                    onError: () => hangUp(false),
                   ),
                 ),
               ],
-              if (!signaling.isLocalStreamOk()) ...[
-                FloatingActionButton(
-                  tooltip: 'Start call',
-                  child: const Icon(Icons.call),
-                  backgroundColor: Colors.green,
-                  onPressed: () async => await doTry(
-                    runAsync: () => join(),
-                    onError: () => hangUp(),
-                  ),
-                ),
-              ] else ...[
+              if (signaling.isLocalStreamOk() && signaling.isJoined()) ...[
                 FloatingActionButton(
                   tooltip: signaling.isScreenSharing() ? 'Change screen sharing' : 'Start screen sharing',
                   backgroundColor: signaling.isScreenSharing() ? Colors.amber : Colors.grey,
@@ -234,7 +243,23 @@ class _MyHomePageState extends State<MyHomePage> {
                   tooltip: 'Hangup',
                   backgroundColor: Colors.red,
                   child: const Icon(Icons.call_end),
-                  onPressed: () => hangUp(),
+                  onPressed: () => hangUp(false),
+                ),
+                FloatingActionButton(
+                  tooltip: 'Exit',
+                  backgroundColor: Colors.red,
+                  child: const Icon(Icons.exit_to_app),
+                  onPressed: () => hangUp(true),
+                ),
+              ] else ...[
+                FloatingActionButton(
+                  tooltip: 'Start call',
+                  child: const Icon(Icons.call),
+                  backgroundColor: Colors.green,
+                  onPressed: () async => await doTry(
+                    runAsync: () => join(),
+                    onError: () => hangUp(false),
+                  ),
                 ),
               ],
             ],
