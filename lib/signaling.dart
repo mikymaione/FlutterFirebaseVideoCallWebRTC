@@ -410,7 +410,7 @@ class Signaling {
         print('got ice candidate, peer $displayName');
       }
 
-      if (iceCandidate.candidate != null) {
+      if (iceCandidate.candidate?.isNotEmpty ?? false) {
         final ice = {
           'uuid': _localUuid,
           'displayName': localDisplayName,

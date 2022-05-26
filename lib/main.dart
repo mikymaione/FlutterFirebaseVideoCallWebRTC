@@ -52,6 +52,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   String roomId = '';
   bool localRendererInitialized = false;
+  bool error = false;
 
   @override
   void initState() {
@@ -96,10 +97,12 @@ class _MyHomePageState extends State<MyHomePage> {
 
     signaling.onConnectionError = (peerUuid, displayName) {
       SnackMsg.showError(context, 'Connection failed with $displayName');
+      error = true;
     };
 
     signaling.onGenericError = (errorText) {
       SnackMsg.showError(context, errorText);
+      error = true;
     };
   }
 
@@ -135,9 +138,18 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
-  void hangUp() {
+  Future<void> join() async {
+    setState(() => error = false);
+    await signaling.join(roomId);
+  }
+
+  void hangUp(bool clearRoom) {
     setState(() {
-      roomId = '';
+      if (clearRoom) {
+        roomId = '';
+      }
+
+      error = false;
 
       signaling.hangUp(localRenderer);
 
@@ -166,14 +178,25 @@ class _MyHomePageState extends State<MyHomePage> {
           spacing: 15,
           children: [
             if (roomId.length > 2) ...[
-              if (!signaling.isLocalStreamOk()) ...[
+              if (error) ...[
                 FloatingActionButton(
-                  tooltip: 'Join room',
+                  tooltip: 'Retry call',
                   child: const Icon(Icons.add_call),
                   backgroundColor: Colors.green,
                   onPressed: () async => await doTry(
-                    runAsync: () => signaling.join(roomId),
-                    onError: () => signaling.hangUp(localRenderer),
+                    runAsync: () => join(),
+                    onError: () => hangUp(false),
+                  ),
+                ),
+              ],
+              if (!signaling.isLocalStreamOk()) ...[
+                FloatingActionButton(
+                  tooltip: 'Start call',
+                  child: const Icon(Icons.call),
+                  backgroundColor: Colors.green,
+                  onPressed: () async => await doTry(
+                    runAsync: () => join(),
+                    onError: () => hangUp(false),
                   ),
                 ),
               ] else ...[
@@ -215,7 +238,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   tooltip: 'Hangup',
                   backgroundColor: Colors.red,
                   child: const Icon(Icons.call_end),
-                  onPressed: () => hangUp(),
+                  onPressed: () => hangUp(true),
                 ),
               ],
             ],
