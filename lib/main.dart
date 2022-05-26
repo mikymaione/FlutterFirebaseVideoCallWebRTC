@@ -57,7 +57,7 @@ class _MyHomePageState extends State<MyHomePage> {
   void initState() {
     super.initState();
 
-    signaling.onAddLocalStream = (peerUuid, stream) async {
+    signaling.onAddLocalStream = (peerUuid, displayName, stream) async {
       if (!localRendererInitialized) {
         await localRenderer.initialize();
         localRendererInitialized = true;
@@ -66,7 +66,7 @@ class _MyHomePageState extends State<MyHomePage> {
       setState(() => localRenderer.srcObject = stream);
     };
 
-    signaling.onAddRemoteStream = (peerUuid, stream) async {
+    signaling.onAddRemoteStream = (peerUuid, displayName, stream) async {
       final remoteRenderer = RTCVideoRenderer();
       await remoteRenderer.initialize();
       remoteRenderer.srcObject = stream;
@@ -74,7 +74,7 @@ class _MyHomePageState extends State<MyHomePage> {
       setState(() => remoteRenderers[peerUuid] = remoteRenderer);
     };
 
-    signaling.onRemoveRemoteStream = (peerUuid) {
+    signaling.onRemoveRemoteStream = (peerUuid, displayName) {
       if (remoteRenderers.containsKey(peerUuid)) {
         remoteRenderers[peerUuid]!.srcObject = null;
         remoteRenderers[peerUuid]!.dispose();
@@ -86,16 +86,16 @@ class _MyHomePageState extends State<MyHomePage> {
       }
     };
 
-    signaling.onConnectionConnected = (peerUuid) {
+    signaling.onConnectionConnected = (peerUuid, displayName) {
       setState(() => remoteRenderersLoading[peerUuid] = false);
     };
 
-    signaling.onConnectionLoading = (peerUuid) {
+    signaling.onConnectionLoading = (peerUuid, displayName) {
       setState(() => remoteRenderersLoading[peerUuid] = true);
     };
 
-    signaling.onConnectionError = (peerUuid) {
-      SnackMsg.showError(context, 'Connection failed with $peerUuid');
+    signaling.onConnectionError = (peerUuid, displayName) {
+      SnackMsg.showError(context, 'Connection failed with $displayName');
     };
 
     signaling.onGenericError = (errorText) {
