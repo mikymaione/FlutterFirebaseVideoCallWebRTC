@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_firebase_video_call_webrtc/firebase_options.dart';
@@ -37,7 +39,12 @@ class MyHomePage extends StatefulWidget {
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  final signaling = Signaling();
+  static const _chars = 'AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz1234567890';
+  static final _rnd = Random();
+
+  static String getRandomString(int length) => String.fromCharCodes(Iterable.generate(length, (index) => _chars.codeUnitAt(_rnd.nextInt(_chars.length))));
+
+  final signaling = Signaling(localDisplayName: getRandomString(20));
 
   final localRenderer = RTCVideoRenderer();
   final Map<String, RTCVideoRenderer> remoteRenderers = {};
@@ -90,6 +97,10 @@ class _MyHomePageState extends State<MyHomePage> {
     signaling.onConnectionError = (peerUuid) {
       SnackMsg.showError(context, 'Connection failed with $peerUuid');
     };
+
+    signaling.onGenericError = (errorText) {
+      SnackMsg.showError(context, errorText);
+    };
   }
 
   @override
@@ -134,10 +145,19 @@ class _MyHomePageState extends State<MyHomePage> {
     });
   }
 
+  bool isMicMuted() {
+    try {
+      return signaling.isMicMuted();
+    } catch (e) {
+      SnackMsg.showError(context, 'Error: $e');
+      return true;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("WebRTC")),
+      appBar: AppBar(title: Text('WebRTC - ${signaling.localDisplayName}')),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       floatingActionButton: FutureBuilder<int>(
         future: signaling.cameraCount(),
@@ -184,9 +204,9 @@ class _MyHomePageState extends State<MyHomePage> {
                   )
                 ],
                 FloatingActionButton(
-                  tooltip: signaling.isMicMuted() ? 'Un-mute mic' : 'Mute mic',
-                  backgroundColor: signaling.isMicMuted() ? Colors.redAccent : Colors.grey,
-                  child: signaling.isMicMuted() ? const Icon(Icons.mic_off) : const Icon(Icons.mic_outlined),
+                  tooltip: isMicMuted() ? 'Un-mute mic' : 'Mute mic',
+                  backgroundColor: isMicMuted() ? Colors.redAccent : Colors.grey,
+                  child: isMicMuted() ? const Icon(Icons.mic_off) : const Icon(Icons.mic_outlined),
                   onPressed: () => doTry(
                     runSync: () => setState(() => signaling.muteMic()),
                   ),

@@ -13,7 +13,7 @@ typedef ConnectionClosedCallback = RTCVideoRenderer Function();
 class Signaling {
   MediaStream? localStream, shareStream;
   StreamStateCallback? onAddRemoteStream, onAddLocalStream;
-  StringCallback? onRemoveRemoteStream, onConnectionLoading, onConnectionConnected, onConnectionError;
+  StringCallback? onRemoveRemoteStream, onConnectionLoading, onConnectionConnected, onConnectionError, onGenericError;
 
   // key is uuid, values are peer connection object and user defined display name string
   final Map<String, RTCPeerConnection> peerConnections = {};
@@ -23,17 +23,19 @@ class Signaling {
   static const tableConnectionParamsFor = 'connectionParamsFor';
   static const tablePeers = 'peers';
 
-  String? localUuid, localDisplayName, appointmentId;
+  final String localDisplayName;
+  String? localUuid, appointmentId;
 
   StreamSubscription? listenerConnectionParams;
 
-  static const _chars = 'AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz1234567890';
-  static final _rnd = Random();
-
-  static String getRandomString(int length) => String.fromCharCodes(Iterable.generate(length, (index) => _chars.codeUnitAt(_rnd.nextInt(_chars.length))));
+  Signaling({required this.localDisplayName});
 
   final iceServers = {
     'iceServers': [
+      {
+        // google stun
+        'urls': ['stun:stun1.l.google.com:19302'],
+      },
       {
         // coturn server
         'urls': ['turn:80.211.89.209:3478'],
@@ -75,13 +77,7 @@ class Signaling {
 
   bool isMicEnabled() {
     if (localStream != null) {
-      try {
-        return localStream!.getAudioTracks().first.enabled;
-      } catch (e) {
-        // no audio
-        print('Error: $e');
-        return false;
-      }
+      return localStream!.getAudioTracks().first.enabled;
     }
 
     return true;
@@ -142,7 +138,6 @@ class Signaling {
   Future<void> join(String _appointmentId) async {
     appointmentId = _appointmentId;
     localUuid = const Uuid().v1();
-    localDisplayName = getRandomString(20);
 
     await _openUserMedia();
 
@@ -159,8 +154,15 @@ class Signaling {
         .get();
 
     for (final peer in peers.docs) {
-      await _connectTo(peer.data(), true);
+      await _helloEveryone(peer.data());
     }
+
+    // add my self to peers list
+    await _writePeer({
+      'uuid': localUuid,
+      'displayName': localDisplayName,
+      'created': FieldValue.serverTimestamp(),
+    });
 
     // WebRTC connection params for me
     listenerConnectionParams = FirebaseFirestore.instance
@@ -171,100 +173,128 @@ class Signaling {
         .collection(tableConnectionParamsFor)
         .doc(localUuid)
         .collection(tableConnectionParams)
+        .orderBy('created')
         .snapshots()
         .listen(
           (snapshot) => snapshot.docs.forEach(
             (params) => _receivedConnectionParams(params.data()),
           ),
         );
-
-    // add my self to peers list
-    await _writePeer({
-      'uuid': localUuid,
-      'displayName': localDisplayName,
-    });
   }
 
-  Future<void> _connectTo(Map<String, dynamic> receivedMsg, bool startOffer) async {
+  Future<void> _helloEveryone(Map<String, dynamic> peerData) async {
+    final String peerId = peerData['uuid'];
+
+    if (peerConnections.containsKey(peerId)) {
+      throw Exception('Peer $peerId already exists!');
+    } else {
+      final pc = await _createPeerConnection(peerId);
+      await _createdDescription(pc, await pc.createOffer(), peerId, 'offer');
+    }
+  }
+
+  Future<RTCPeerConnection> _createPeerConnection(String fromPeerId) async {
+    if (kDebugMode) {
+      print('Create PeerConnection with configuration: $iceServers');
+    }
+
+    final pc = await createPeerConnection(iceServers);
+
+    peerConnections.putIfAbsent(fromPeerId, () => pc);
+
+    pc.onIceCandidate = (event) => _gotIceCandidate(event, fromPeerId);
+    pc.onTrack = (event) => _gotRemoteStream(event, fromPeerId);
+    pc.onIceConnectionState = (event) => _checkConnectionState(event, fromPeerId);
+
+    for (final track in localStream!.getTracks()) {
+      await pc.addTrack(track, localStream!);
+    }
+
+    return pc;
+  }
+
+  Future<void> _manageSdp(Map<String, dynamic> receivedMsg) async {
     final String fromPeerId = receivedMsg['uuid'];
+    //final String displayName = receivedMsg['displayName'];
+    final sdp = receivedMsg['sdp'];
+    final sdpType = receivedMsg['sdpType'];
+
+    if ('offer' == sdpType) {
+      if (!peerConnections.containsKey(fromPeerId)) {
+        final pc = await _createPeerConnection(fromPeerId);
+
+        await pc.setRemoteDescription(RTCSessionDescription(sdp['sdp'], sdp['type']));
+
+        await _createdDescription(pc, await pc.createAnswer(), fromPeerId, 'answer');
+      }
+    } else if ('answer' == sdpType) {
+      final pc = peerConnections[fromPeerId];
+
+      if (pc?.getRemoteDescription() != null) {
+        switch (pc?.signalingState) {
+          case RTCSignalingState.RTCSignalingStateStable:
+          case RTCSignalingState.RTCSignalingStateClosed:
+            break;
+
+          default:
+            await pc?.setRemoteDescription(RTCSessionDescription(sdp['sdp'], sdp['type']));
+            break;
+        }
+      }
+    }
+  }
+
+  Future<void> _manageIce(Map<String, dynamic> receivedMsg) async {
+    final String fromPeerId = receivedMsg['uuid'];
+    final String displayName = receivedMsg['displayName'];
+    final ice = receivedMsg['ice'];
 
     if (peerConnections.containsKey(fromPeerId)) {
-      if (kDebugMode) {
-        print('Peer $fromPeerId already exists!');
-      }
+      final pc = peerConnections[fromPeerId]!;
+
+      await pc.addCandidate(RTCIceCandidate(ice['candidate'], ice['sdpMid'], ice['sdpMLineIndex']));
     } else {
-      // set up peer connection object for a newcomer peer
-      if (kDebugMode) {
-        print('_newPeer: $fromPeerId');
-      }
-
-      final pc = await createPeerConnection(iceServers);
-
-      peerConnections.putIfAbsent(fromPeerId, () => pc);
-
-      pc.onIceCandidate = (event) => _gotIceCandidate(event, fromPeerId);
-      pc.onTrack = (event) => _gotRemoteStream(event, fromPeerId);
-      pc.onIceConnectionState = (event) => _checkConnectionState(event, fromPeerId);
-
-      // deprecated -> Safari error
-      //pc.addStream(localStream!);
-      localStream!.getTracks().forEach((track) => pc.addTrack(track, localStream!));
-
-      if (startOffer) {
-        if (kDebugMode) {
-          print('createOffer from $localUuid to $fromPeerId');
-        }
-
-        await _createdDescription(pc, await pc.createOffer(), fromPeerId);
-      }
+      throw Exception('Received ICE candidate, but $displayName have not a peer connection');
     }
   }
 
   Future<void> _receivedConnectionParams(Map<String, dynamic> receivedMsg) async {
-    final String fromPeerId = receivedMsg['uuid'];
-
-    if (!peerConnections.containsKey(fromPeerId)) {
-      await _connectTo(receivedMsg, false);
-    }
-
-    final pc = peerConnections[fromPeerId]!;
-
     if (receivedMsg.containsKey('sdp')) {
-      final sdp = receivedMsg['sdp'];
-
-      await pc.setRemoteDescription(RTCSessionDescription(sdp['sdp'], sdp['type']));
-
-      // Only create answers in response to offers
-      if ('offer' == sdp['type']) {
-        if (kDebugMode) {
-          print('createAnswer from $localUuid to $fromPeerId');
-        }
-
-        await _createdDescription(pc, await pc.createAnswer(), fromPeerId);
+      try {
+        await _manageSdp(receivedMsg);
+      } catch (sdpE) {
+        onGenericError?.call('Error in SDP routine: $sdpE');
       }
     } else if (receivedMsg.containsKey('ice')) {
-      final ice = receivedMsg['ice'];
-
-      await pc.addCandidate(RTCIceCandidate(ice['candidate'], ice['sdpMid'], ice['sdpMLineIndex']));
+      try {
+        await _manageIce(receivedMsg);
+      } catch (iceE) {
+        onGenericError?.call('Error in ICE routine: $iceE');
+      }
+    } else {
+      final String displayName = receivedMsg['displayName'];
+      onGenericError?.call('I have received a strange message from $displayName: $receivedMsg');
     }
   }
 
-  Future<void> _createdDescription(RTCPeerConnection pc, RTCSessionDescription description, String destinationPeerId) async {
+  Future<void> _createdDescription(RTCPeerConnection pc, RTCSessionDescription description, String destinationPeerId, String sdpType) async {
     if (kDebugMode) {
-      print('got description, peer $destinationPeerId');
+      print('create description $sdpType, for peer $destinationPeerId');
     }
 
     await pc.setLocalDescription(description);
 
     await _writeParamsToDb(destinationPeerId, {
       'uuid': localUuid,
+      'displayName': localDisplayName,
+      'sdpType': sdpType,
       'sdp': description.toMap(),
+      'created': FieldValue.serverTimestamp(),
     });
   }
 
-  void _checkConnectionState(RTCIceConnectionState event, String peerUuid) {
-    final state = peerConnections[peerUuid]?.iceConnectionState;
-
+  void _checkConnectionState(RTCIceConnectionState state, String peerUuid) {
+    //final state = peerConnections[peerUuid]?.iceConnectionState;
     if (kDebugMode) {
       print('connection with peer $peerUuid $state');
     }
@@ -311,7 +341,9 @@ class Signaling {
     if (event.candidate != null) {
       await _writeParamsToDb(peerUuid, {
         'uuid': localUuid,
+        'displayName': localDisplayName,
         'ice': event.toMap(),
+        'created': FieldValue.serverTimestamp(),
       });
     }
   }
@@ -319,9 +351,20 @@ class Signaling {
   Future<void> _openUserMedia() async {
     localStream = await navigator.mediaDevices.getUserMedia({'video': true, 'audio': true});
 
-    if (kDebugMode) {
-      print('Video tracks: ${localStream?.getVideoTracks().length}');
-      print('Audio tracks: ${localStream?.getAudioTracks().length}');
+    if ((localStream?.getVideoTracks().length ?? 0) == 0) {
+      throw Exception('There are no video tracks');
+    } else {
+      if (kDebugMode) {
+        print('Video tracks: ${localStream?.getVideoTracks().length}');
+      }
+    }
+
+    if ((localStream?.getAudioTracks().length ?? 0) == 0) {
+      throw Exception('There are no audio tracks');
+    } else {
+      if (kDebugMode) {
+        print('Audio tracks: ${localStream?.getAudioTracks().length}');
+      }
     }
 
     onAddLocalStream?.call(localUuid!, localStream!);
