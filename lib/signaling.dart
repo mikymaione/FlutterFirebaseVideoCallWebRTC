@@ -261,14 +261,18 @@ class Signaling {
       if (!_peerBanned.contains(fromPeerId)) {
         try {
           if ('offer' == sdpType) {
+            // peer A that was in room, receive an Offer from peer B, and send an Answer
+
             if (!_peerConnections.containsKey(fromPeerId)) {
               final pc = await _createPeerConnection(fromPeerId, displayName);
 
               await pc.setRemoteDescription(RTCSessionDescription(sdp['sdp'], sdp['type']));
 
               await _createdDescription(pc, await pc.createAnswer(), fromPeerId, 'answer');
+              _startListenIce();
             }
           } else if ('answer' == sdpType) {
+            // peer B enter room, that sent an Offer to peer A receive an Answer from peer A
             final pc = _peerConnections[fromPeerId];
 
             if (pc?.getRemoteDescription() != null) {
@@ -428,7 +432,12 @@ class Signaling {
   }
 
   Future<void> _openUserMedia() async {
-    _localStream = await navigator.mediaDevices.getUserMedia({'video': true, 'audio': true});
+    _localStream = await navigator.mediaDevices.getUserMedia({
+      'audio': true,
+      'video': {
+        'facingMode': 'user', // front camera
+      }
+    });
 
     if ((_localStream?.getVideoTracks().length ?? 0) == 0) {
       throw Exception('There are no video tracks');
