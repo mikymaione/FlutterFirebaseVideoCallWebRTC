@@ -52,6 +52,7 @@ class _MyHomePageState extends State<MyHomePage> {
 
   String roomId = '';
 
+  bool localRenderOk = false;
   bool error = false;
 
   @override
@@ -59,7 +60,10 @@ class _MyHomePageState extends State<MyHomePage> {
     super.initState();
 
     signaling.onAddLocalStream = (peerUuid, displayName, stream) {
-      setState(() => localRenderer.srcObject = stream);
+      setState(() {
+        localRenderer.srcObject = stream;
+        localRenderOk = stream != null;
+      });
     };
 
     signaling.onAddRemoteStream = (peerUuid, displayName, stream) async {
@@ -161,7 +165,7 @@ class _MyHomePageState extends State<MyHomePage> {
       }
     });
 
-    await signaling.hangUp(exit ? localRenderer : null);
+    await signaling.hangUp(exit);
 
     setState(() {
       disposeRemoteRenderers();
@@ -188,7 +192,7 @@ class _MyHomePageState extends State<MyHomePage> {
         builder: (context, cameraCountSnap) => Wrap(
           spacing: 15,
           children: [
-            if (!signaling.isLocalStreamOk()) ...[
+            if (!localRenderOk) ...[
               FloatingActionButton(
                 tooltip: 'Open camera',
                 backgroundColor: Colors.redAccent,
@@ -210,7 +214,7 @@ class _MyHomePageState extends State<MyHomePage> {
                   ),
                 ),
               ],
-              if (signaling.isLocalStreamOk() && signaling.isJoined()) ...[
+              if (localRenderOk && signaling.isJoined()) ...[
                 FloatingActionButton(
                   tooltip: signaling.isScreenSharing() ? 'Change screen sharing' : 'Start screen sharing',
                   backgroundColor: signaling.isScreenSharing() ? Colors.amber : Colors.grey,
@@ -297,7 +301,7 @@ class _MyHomePageState extends State<MyHomePage> {
             Expanded(
               child: view(
                 children: [
-                  if (signaling.isLocalStreamOk()) ...[
+                  if (localRenderOk) ...[
                     Expanded(
                       child: Container(
                         margin: const EdgeInsets.all(4),

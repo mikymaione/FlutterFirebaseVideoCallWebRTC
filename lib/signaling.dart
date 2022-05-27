@@ -9,7 +9,7 @@ import 'package:uuid/uuid.dart';
 
 typedef ErrorCallback = void Function(String error);
 typedef PeerCallback = void Function(String peerUuid, String displayName);
-typedef StreamStateCallback = void Function(String peerUuid, String displayName, MediaStream stream);
+typedef StreamStateCallback = void Function(String peerUuid, String displayName, MediaStream? stream);
 typedef ConnectionClosedCallback = RTCVideoRenderer Function();
 
 class Signaling {
@@ -66,10 +66,6 @@ class Signaling {
     return _appointmentId != null;
   }
 
-  bool isLocalStreamOk() {
-    return _localStream != null;
-  }
-
   Future<void> switchCamera() async {
     if (!kIsWeb && _localStream != null) {
       await Helper.switchCamera(_localStream!.getVideoTracks().first);
@@ -122,7 +118,7 @@ class Signaling {
     }
   }
 
-  Future<void> hangUp(RTCVideoRenderer? localVideo) async {
+  Future<void> hangUp(bool updateLocalVideo) async {
     await _listenerSdp?.cancel();
     await _listenerIce?.cancel();
 
@@ -131,8 +127,8 @@ class Signaling {
 
     await stopScreenSharing();
 
-    if (localVideo != null) {
-      localVideo.srcObject = null;
+    if (updateLocalVideo) {
+      onAddLocalStream?.call('', localDisplayName, null);
 
       if (_localStream != null) {
         for (final track in _localStream!.getTracks()) {
@@ -507,14 +503,16 @@ class Signaling {
     );
 
     // remove all params for me
-    await FirebaseFirestore.instance
+    final docRef = await FirebaseFirestore.instance
         .collection(
           collectionVideoCall,
         )
         .doc(_appointmentId)
         .collection(tableConnectionParamsFor)
         .doc(_localUuid)
-        .delete();
+        .get();
+
+    await docRef.reference.delete();
   }
 
   Future<void> _replaceStream(MediaStream stream) async {
