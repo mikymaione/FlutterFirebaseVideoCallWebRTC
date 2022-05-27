@@ -140,6 +140,11 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
+  Future<void> reJoin() async {
+    await hangUp(false);
+    await join();
+  }
+
   Future<void> join() async {
     setState(() => error = false);
 
@@ -147,17 +152,18 @@ class _MyHomePageState extends State<MyHomePage> {
     await signaling.join(roomId);
   }
 
-  void hangUp(bool exit) {
+  Future<void> hangUp(bool exit) async {
     setState(() {
       error = false;
 
       if (exit) {
         roomId = '';
-        signaling.hangUp(localRenderer);
-      } else {
-        signaling.hangUp(null);
       }
+    });
 
+    await signaling.hangUp(exit ? localRenderer : null);
+
+    setState(() {
       disposeRemoteRenderers();
     });
   }
@@ -291,7 +297,7 @@ class _MyHomePageState extends State<MyHomePage> {
             Expanded(
               child: view(
                 children: [
-                  if (localRenderer.srcObject != null) ...[
+                  if (signaling.isLocalStreamOk()) ...[
                     Expanded(
                       child: Container(
                         margin: const EdgeInsets.all(4),

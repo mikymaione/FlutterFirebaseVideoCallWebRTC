@@ -92,12 +92,17 @@ class Signaling {
     return _shareStream != null;
   }
 
-  void stopScreenSharing() {
-    _shareStream?.getTracks().forEach((track) => track.stop());
-    _shareStream?.dispose();
-    _shareStream = null;
+  Future<void> stopScreenSharing() async {
+    if (_shareStream != null) {
+      for (final track in _shareStream!.getTracks()) {
+        await track.stop();
+      }
 
-    _replaceStream(_localStream!);
+      await _shareStream?.dispose();
+      _shareStream = null;
+    }
+
+    await _replaceStream(_localStream!);
   }
 
   Future<void> screenSharing() async {
@@ -108,7 +113,7 @@ class Signaling {
       },
     });
 
-    _replaceStream(_shareStream!);
+    await _replaceStream(_shareStream!);
   }
 
   void muteMic() {
@@ -118,15 +123,13 @@ class Signaling {
   }
 
   Future<void> hangUp(RTCVideoRenderer? localVideo) async {
-    _appointmentId = null;
-
-    _listenerSdp?.cancel();
-    _listenerIce?.cancel();
+    await _listenerSdp?.cancel();
+    await _listenerIce?.cancel();
 
     _listenerSdp = null;
     _listenerIce = null;
 
-    stopScreenSharing();
+    await stopScreenSharing();
 
     if (localVideo != null) {
       localVideo.srcObject = null;
@@ -149,6 +152,8 @@ class Signaling {
     _peerBanned.clear();
 
     await _clearAllFirebaseData();
+
+    _appointmentId = null;
   }
 
   Future<void> join(String appointmentId) async {
@@ -199,8 +204,8 @@ class Signaling {
         .snapshots()
         .listen(
       (snapshot) {
-        for (final sdp in snapshot.docs) {
-          _manageIce(sdp.data());
+        for (final ice in snapshot.docs) {
+          _manageIce(ice.data());
         }
       },
     );
@@ -220,8 +225,8 @@ class Signaling {
         .snapshots()
         .listen(
       (snapshot) {
-        for (final ice in snapshot.docs) {
-          _manageSdp(ice.data());
+        for (final sdp in snapshot.docs) {
+          _manageSdp(sdp.data());
         }
       },
     );
