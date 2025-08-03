@@ -19,7 +19,7 @@ Future<void> main() async {
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({Key? key}) : super(key: key);
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -38,10 +38,10 @@ class MyApp extends StatelessWidget {
 }
 
 class MyHomePage extends StatefulWidget {
-  const MyHomePage({Key? key}) : super(key: key);
+  const MyHomePage({super.key});
 
   @override
-  _MyHomePageState createState() => _MyHomePageState();
+  State<MyHomePage> createState() => _MyHomePageState();
 }
 
 class _MyHomePageState extends State<MyHomePage> {
@@ -145,7 +145,10 @@ class _MyHomePageState extends State<MyHomePage> {
       runSync?.call();
       await runAsync?.call();
     } catch (e) {
-      SnackMsg.showError(context, 'Error: $e');
+      if (mounted) {
+        SnackMsg.showError(context, 'Error: $e');
+      }
+      
       onError?.call();
     }
   }
@@ -190,7 +193,7 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('WebRTC - [MAIONE MIKΨ]')),
+      appBar: AppBar(title: const Text('WebRTC - [MAIONE MIKΨ]')),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       floatingActionButton: FutureBuilder<int>(
         future: signaling.cameraCount(),
@@ -212,8 +215,8 @@ class _MyHomePageState extends State<MyHomePage> {
               if (error) ...[
                 FloatingActionButton(
                   tooltip: 'Retry call',
-                  child: const Icon(Icons.add_call),
                   backgroundColor: Colors.green,
+                  child: const Icon(Icons.add_call),
                   onPressed: () async => await doTry(
                     runAsync: () => join(),
                     onError: () => hangUp(false),
@@ -270,8 +273,8 @@ class _MyHomePageState extends State<MyHomePage> {
               ] else ...[
                 FloatingActionButton(
                   tooltip: 'Start call',
-                  child: const Icon(Icons.call),
                   backgroundColor: Colors.green,
+                  child: const Icon(Icons.call),
                   onPressed: () async => await doTry(
                     runAsync: () => join(),
                     onError: () => hangUp(false),
