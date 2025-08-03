@@ -24,8 +24,14 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: "WebRTC",
-      theme: ThemeData(primarySwatch: Colors.orange),
+      title: "WebRTC - [MAIONE MIKΨ]",
+      themeMode: ThemeMode.system,
+      theme: ThemeData(
+        brightness: Brightness.light,
+      ),
+      darkTheme: ThemeData(
+        brightness: Brightness.dark,
+      ),
       home: const MyHomePage(),
     );
   }
@@ -184,7 +190,7 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('WebRTC - ${signaling.localDisplayName}')),
+      appBar: AppBar(title: Text('WebRTC - [MAIONE MIKΨ]')),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       floatingActionButton: FutureBuilder<int>(
         future: signaling.cameraCount(),
@@ -286,7 +292,7 @@ class _MyHomePageState extends State<MyHomePage> {
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  const Text("Room ID: "),
+                  const Text("Join room ID: "),
                   Flexible(
                     child: TextFormField(
                       initialValue: roomId,

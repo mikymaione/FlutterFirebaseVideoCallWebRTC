@@ -35,16 +35,21 @@ class Signaling {
 
   Signaling({required this.localDisplayName});
 
+  // my Coturn server
   final _iceServers = {
     'iceServers': [
       {
-        'urls': 'stun:stun.l.google.com:19302',
+        'urls': [
+          'stun:94.177.160.139:3478'
+        ],
       },
       {
-        // coturn server
-        'urls': ['turn:openrelay.metered.ca:80'],
-        'username': 'openrelayproject',
-        'credential': 'openrelayproject',        
+        'urls': [
+          'turn:94.177.160.139:3478?transport=udp',
+          'turn:94.177.160.139:3478?transport=tcp',
+        ],
+        'username': 'coturn',
+        'credential': 'coturn',
       },
     ]
   };
