@@ -38,6 +38,9 @@ class Signaling {
   final _iceServers = {
     'iceServers': [
       {
+        'urls': 'stun:stun.l.google.com:19302',
+      },
+      {
         // coturn server
         'urls': ['turn:openrelay.metered.ca:80'],
         'username': 'openrelayproject',
