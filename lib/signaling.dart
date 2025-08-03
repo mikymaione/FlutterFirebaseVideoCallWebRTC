@@ -39,9 +39,9 @@ class Signaling {
     'iceServers': [
       {
         // coturn server
-        'urls': ['turn:80.211.89.209:3478'],
-        'username': 'coturn',
-        'credential': 'coturn',
+        'urls': ['turn:openrelay.metered.ca:80'],
+        'username': 'openrelayproject',
+        'credential': 'openrelayproject',        
       },
     ]
   };
