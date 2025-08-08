@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_firebase_video_call_webrtc/signaling.dart';
 import 'package:flutter_firebase_video_call_webrtc/snack_msg.dart';
+import 'package:flutter_firebase_video_call_webrtc/webrtc_body.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
 
 typedef ExecuteCallback = void Function();
@@ -107,11 +108,6 @@ class _MyHomePageState extends State<MyHomePage> {
     remoteRenderers.clear();
   }
 
-  Flex view({required List<Widget> children}) {
-    final isLandscape = MediaQuery.of(context).size.width > MediaQuery.of(context).size.height;
-    return isLandscape ? Row(children: children) : Column(children: children);
-  }
-
   Future<void> doTry({ExecuteCallback? runSync, ExecuteFutureCallback? runAsync, ExecuteCallback? onError}) async {
     try {
       runSync?.call();
@@ -120,7 +116,7 @@ class _MyHomePageState extends State<MyHomePage> {
       if (mounted) {
         SnackMsg.showError(context, 'Error: $e');
       }
-      
+
       onError?.call();
     }
   }
@@ -257,68 +253,14 @@ class _MyHomePageState extends State<MyHomePage> {
           ],
         ),
       ),
-      body: Container(
-        margin: const EdgeInsets.all(8.0),
-        child: Column(
-          children: [
-            // room
-            Container(
-              margin: const EdgeInsets.all(8.0),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Text("Join room ID: "),
-                  Flexible(
-                    child: TextFormField(
-                      initialValue: roomId,
-                      onChanged: (value) => setState(() => roomId = value),
-                    ),
-                  )
-                ],
-              ),
-            ),
-
-            // streaming
-            Expanded(
-              child: view(
-                children: [
-                  if (localRenderOk) ...[
-                    Expanded(
-                      child: Container(
-                        margin: const EdgeInsets.all(4),
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          border: Border.all(
-                            color: const Color(0XFF2493FB),
-                          ),
-                        ),
-                        child: RTCVideoView(localRenderer, mirror: !signaling.isScreenSharing()),
-                      ),
-                    ),
-                  ],
-                  for (final remoteRenderer in remoteRenderers.entries) ...[
-                    Expanded(
-                      child: Container(
-                        margin: const EdgeInsets.all(4),
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          border: Border.all(
-                            color: const Color(0XFF2493FB),
-                          ),
-                        ),
-                        child: false == remoteRenderersLoading[remoteRenderer.key] // && true == remoteRenderer.value.srcObject?.active
-                            ? RTCVideoView(remoteRenderer.value)
-                            : const Center(
-                                child: CircularProgressIndicator(),
-                              ),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ],
-        ),
+      body: WebRTCBody(
+        roomId: roomId,
+        localRenderOk: localRenderOk,
+        remoteRenderers: remoteRenderers,
+        remoteRenderersLoading: remoteRenderersLoading,
+        localRenderer: localRenderer,
+        onRoomIdChanged: (value) => setState(() => roomId = value),
+        signaling: signaling,
       ),
     );
   }
