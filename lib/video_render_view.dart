@@ -18,12 +18,6 @@ class VideoRendererView extends StatelessWidget {
     return Expanded(
       child: Container(
         margin: const EdgeInsets.all(4),
-        padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(
-          border: Border.all(
-            color: const Color(0XFF2493FB),
-          ), // TODO - RIMUOVERE
-        ),
         child: loading
             ? const Center(
                 child: CircularProgressIndicator(),
