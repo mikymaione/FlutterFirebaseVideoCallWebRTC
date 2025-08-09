@@ -52,35 +52,35 @@ class WebRTCBody extends StatelessWidget {
     final columns = layout.columns;
     final rows = layout.rows;
 
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final itemWidth = constraints.maxWidth / columns;
-        final itemHeight = constraints.maxHeight / rows;
-
-        return Container(
-          margin: const EdgeInsets.all(8.0),
-          child: Column(
-            children: [
-              // Room ID input
-              Container(
-                margin: const EdgeInsets.all(8.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Text("Join room ID: "),
-                    Flexible(
-                      child: TextFormField(
-                        initialValue: roomId,
-                        onChanged: onRoomIdChanged,
-                      ),
-                    ),
-                  ],
+    return Container(
+      margin: const EdgeInsets.all(8.0),
+      child: Column(
+        children: [
+          // Room ID input
+          Container(
+            margin: const EdgeInsets.all(8.0),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Text("Join room ID: "),
+                Flexible(
+                  child: TextFormField(
+                    initialValue: roomId,
+                    onChanged: onRoomIdChanged,
+                  ),
                 ),
-              ),
+              ],
+            ),
+          ),
 
-              // Griglia fissa senza scroll
-              Expanded(
-                child: Center(
+          // Griglia video che occupa lo spazio rimanente
+          Expanded(
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final itemWidth = constraints.maxWidth / columns;
+                final itemHeight = constraints.maxHeight / rows;
+
+                return Center(
                   child: SizedBox(
                     width: itemWidth * columns,
                     height: itemHeight * rows,
@@ -98,12 +98,12 @@ class WebRTCBody extends StatelessWidget {
                       ),
                     ),
                   ),
-                ),
-              ),
-            ],
+                );
+              },
+            ),
           ),
-        );
-      },
+        ],
+      ),
     );
   }
 }
