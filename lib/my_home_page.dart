@@ -20,8 +20,12 @@ class _MyHomePageState extends State<MyHomePage> {
   static const _chars = 'AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz1234567890';
   static final _rnd = Random();
 
-  static String getRandomString(int length) =>
-      String.fromCharCodes(Iterable.generate(length, (index) => _chars.codeUnitAt(_rnd.nextInt(_chars.length))));
+  static String getRandomString(int length) => String.fromCharCodes(
+        Iterable.generate(
+          length,
+          (index) => _chars.codeUnitAt(_rnd.nextInt(_chars.length)),
+        ),
+      );
 
   final signaling = Signaling(localDisplayName: getRandomString(20));
 
@@ -97,7 +101,9 @@ class _MyHomePageState extends State<MyHomePage> {
 
   Future<void> initCamera() async {
     await localRenderer.initialize();
-    await doTry(runAsync: () => signaling.openUserMedia());
+    await doTry(
+      runAsync: () => signaling.openUserMedia(),
+    );
   }
 
   void disposeRemoteRenderers() {
@@ -223,7 +229,9 @@ class _MyHomePageState extends State<MyHomePage> {
                   backgroundColor: isMicMuted() ? Colors.redAccent : Colors.grey,
                   child: isMicMuted() ? const Icon(Icons.mic_off) : const Icon(Icons.mic_outlined),
                   onPressed: () => doTry(
-                    runSync: () => setState(() => signaling.muteMic()),
+                    runSync: () => setState(
+                      () => signaling.muteMic(),
+                    ),
                   ),
                 ),
                 FloatingActionButton(
@@ -259,7 +267,9 @@ class _MyHomePageState extends State<MyHomePage> {
         remoteRenderers: remoteRenderers,
         remoteRenderersLoading: remoteRenderersLoading,
         localRenderer: localRenderer,
-        onRoomIdChanged: (value) => setState(() => roomId = value),
+        onRoomIdChanged: (value) => setState(
+          () => roomId = value,
+        ),
         signaling: signaling,
       ),
     );

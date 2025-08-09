@@ -91,13 +91,11 @@ class WebRTCBody extends StatelessWidget {
                         childAspectRatio: itemWidth / itemHeight,
                       ),
                       itemCount: allRenderers.length,
-                      itemBuilder: (context, index) {
-                        return SizedBox(
-                          width: itemWidth,
-                          height: itemHeight,
-                          child: allRenderers[index],
-                        );
-                      },
+                      itemBuilder: (context, index) => SizedBox(
+                        width: itemWidth,
+                        height: itemHeight,
+                        child: allRenderers[index],
+                      ),
                     ),
                   ),
                 ),
