@@ -1,6 +1,5 @@
-import 'dart:math';
-
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_firebase_video_call_webrtc/signaling.dart';
 import 'package:flutter_firebase_video_call_webrtc/snack_msg.dart';
 import 'package:flutter_firebase_video_call_webrtc/webrtc_body.dart';
@@ -10,30 +9,20 @@ typedef ExecuteCallback = void Function();
 typedef ExecuteFutureCallback = Future<void> Function();
 
 class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key});
+  final String roomId;
+
+  const MyHomePage({super.key, required this.roomId});
 
   @override
   State<MyHomePage> createState() => _MyHomePageState();
 }
 
 class _MyHomePageState extends State<MyHomePage> {
-  static const _chars = 'AaBbCcDdEeFfGgHhIiJjKkLlMmNnOoPpQqRrSsTtUuVvWwXxYyZz1234567890';
-  static final _rnd = Random();
-
-  static String getRandomString(int length) => String.fromCharCodes(
-        Iterable.generate(
-          length,
-          (index) => _chars.codeUnitAt(_rnd.nextInt(_chars.length)),
-        ),
-      );
-
-  final signaling = Signaling(localDisplayName: getRandomString(20));
+  late final Signaling signaling;
 
   final localRenderer = RTCVideoRenderer();
   final Map<String, RTCVideoRenderer> remoteRenderers = {};
   final Map<String, bool?> remoteRenderersLoading = {};
-
-  String roomId = '';
 
   bool localRenderOk = false;
   bool error = false;
@@ -41,6 +30,8 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void initState() {
     super.initState();
+
+    signaling = Signaling(localDisplayName: widget.roomId);
 
     signaling.onAddLocalStream = (peerUuid, displayName, stream) {
       setState(() {
@@ -136,7 +127,7 @@ class _MyHomePageState extends State<MyHomePage> {
     setState(() => error = false);
 
     await signaling.reOpenUserMedia();
-    await signaling.join(roomId);
+    await signaling.join(widget.roomId);
   }
 
   Future<void> hangUp(bool exit) async {
@@ -144,7 +135,7 @@ class _MyHomePageState extends State<MyHomePage> {
       error = false;
 
       if (exit) {
-        roomId = '';
+        // widget.roomId = '';
       }
     });
 
@@ -175,6 +166,22 @@ class _MyHomePageState extends State<MyHomePage> {
         builder: (context, cameraCountSnap) => Wrap(
           spacing: 15,
           children: [
+            FloatingActionButton(
+              tooltip: 'Share Room',
+              backgroundColor: Colors.blueAccent,
+              child: const Icon(Icons.share_outlined),
+              onPressed: () async {
+                final roomUrl = 'https://mikymaione.github.io/webrtc.github.io/${widget.roomId}';
+
+                await Clipboard.setData(
+                  ClipboardData(
+                    text: 'Join my video call room: $roomUrl',
+                  ),
+                );
+                
+                SnackMsg.showInfo(context, 'Invite link copied to clipboard!');
+              },
+            ),
             if (!localRenderOk) ...[
               FloatingActionButton(
                 tooltip: 'Open camera',
@@ -185,7 +192,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 ),
               ),
             ],
-            if (roomId.length > 2) ...[
+            if (widget.roomId.length > 2) ...[
               if (error) ...[
                 FloatingActionButton(
                   tooltip: 'Retry call',
@@ -262,14 +269,11 @@ class _MyHomePageState extends State<MyHomePage> {
         ),
       ),
       body: WebRTCBody(
-        roomId: roomId,
+        roomId: widget.roomId,
         localRenderOk: localRenderOk,
         remoteRenderers: remoteRenderers,
         remoteRenderersLoading: remoteRenderersLoading,
         localRenderer: localRenderer,
-        onRoomIdChanged: (value) => setState(
-          () => roomId = value,
-        ),
         signaling: signaling,
       ),
     );

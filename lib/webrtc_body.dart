@@ -10,7 +10,6 @@ class WebRTCBody extends StatelessWidget {
   final Map<String, RTCVideoRenderer> remoteRenderers;
   final Map<String, bool?> remoteRenderersLoading;
   final RTCVideoRenderer localRenderer;
-  final ValueChanged<String> onRoomIdChanged;
   final Signaling signaling;
 
   const WebRTCBody({
@@ -20,7 +19,6 @@ class WebRTCBody extends StatelessWidget {
     required this.remoteRenderers,
     required this.remoteRenderersLoading,
     required this.localRenderer,
-    required this.onRoomIdChanged,
     required this.signaling,
   });
 
@@ -62,11 +60,11 @@ class WebRTCBody extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Text("Join room ID: "),
+                const Text("Room ID: "),
                 Flexible(
                   child: TextFormField(
                     initialValue: roomId,
-                    onChanged: onRoomIdChanged,
+                    readOnly: true,
                   ),
                 ),
               ],
