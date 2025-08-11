@@ -7,6 +7,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      debugShowCheckedModeBanner: true,
       title: "WebRTC - [MAIONE MIKΨ]",
       themeMode: ThemeMode.system,
       theme: ThemeData(
