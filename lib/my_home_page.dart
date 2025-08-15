@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_firebase_video_call_webrtc/signaling.dart';
 import 'package:flutter_firebase_video_call_webrtc/snack_msg.dart';
 import 'package:flutter_firebase_video_call_webrtc/webrtc_body.dart';
@@ -29,7 +30,7 @@ class _MyHomePageState extends State<MyHomePage> {
   final Map<String, RTCVideoRenderer> remoteRenderers = {};
   final Map<String, bool?> remoteRenderersLoading = {};
 
-  String roomId = '';
+  final roomIdController = TextEditingController();
 
   bool localRenderOk = false;
   bool error = false;
@@ -37,6 +38,14 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   void initState() {
     super.initState();
+
+    roomIdController.addListener(() {
+      if (mounted) {
+        setState(() {
+          //
+        });
+      }
+    });
 
     signaling.onAddLocalStream = (peerUuid, displayName, stream) {
       setState(() {
@@ -83,12 +92,17 @@ class _MyHomePageState extends State<MyHomePage> {
       error = true;
     };
 
+    final uri = Uri.base;
+    final roomIdFromUrl = uri.queryParameters['roomId'] ?? '';
+    roomIdController.text = roomIdFromUrl;
+
     initCamera();
   }
 
   @override
   void dispose() {
     localRenderer.dispose();
+    roomIdController.dispose();
 
     disposeRemoteRenderers();
 
@@ -130,7 +144,7 @@ class _MyHomePageState extends State<MyHomePage> {
     setState(() => error = false);
 
     await signaling.reOpenUserMedia();
-    await signaling.join(roomId);
+    await signaling.join(roomIdController.text);
   }
 
   Future<void> hangUp(bool exit) async {
@@ -138,7 +152,7 @@ class _MyHomePageState extends State<MyHomePage> {
       error = false;
 
       if (exit) {
-        roomId = '';
+        roomIdController.text = '';
       }
     });
 
@@ -161,7 +175,11 @@ class _MyHomePageState extends State<MyHomePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('WebRTC - [MAIONE MIKΨ]')),
+      appBar: AppBar(
+        title: const Text(
+          'WebRTC - [MAIONE MIKΨ]',
+        ),
+      ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       floatingActionButton: FutureBuilder<int>(
         future: signaling.cameraCount(),
@@ -169,6 +187,33 @@ class _MyHomePageState extends State<MyHomePage> {
         builder: (context, cameraCountSnap) => Wrap(
           spacing: 15,
           children: [
+            if (roomIdController.text.length > 2) ...[
+              FloatingActionButton(
+                tooltip: 'Share room link',
+                backgroundColor: Colors.blueAccent,
+                child: const Icon(Icons.share),
+                onPressed: () async {
+                  final roomUrl = 'https://mikymaione.github.io/webrtc.github.io?roomId=${roomIdController.text}';
+
+                  final shareText = '''
+Join my WebRTC room
+
+Room ID: ${roomIdController.text}
+Link: $roomUrl
+''';
+
+                  await Clipboard.setData(
+                    ClipboardData(
+                      text: shareText,
+                    ),
+                  );
+
+                  if (mounted) {
+                    SnackMsg.showInfo(context, 'Room link copied to clipboard!');
+                  }
+                },
+              ),
+            ],
             if (!localRenderOk) ...[
               FloatingActionButton(
                 tooltip: 'Open camera',
@@ -179,7 +224,7 @@ class _MyHomePageState extends State<MyHomePage> {
                 ),
               ),
             ],
-            if (roomId.length > 2) ...[
+            if (roomIdController.text.length > 2) ...[
               if (error) ...[
                 FloatingActionButton(
                   tooltip: 'Retry call',
@@ -254,12 +299,11 @@ class _MyHomePageState extends State<MyHomePage> {
         ),
       ),
       body: WebRTCBody(
-        roomId: roomId,
+        controller: roomIdController,
         localRenderOk: localRenderOk,
         remoteRenderers: remoteRenderers,
         remoteRenderersLoading: remoteRenderersLoading,
         localRenderer: localRenderer,
-        onRoomIdChanged: (value) => setState(() => roomId = value),
         signaling: signaling,
       ),
     );

@@ -2,24 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:flutter_firebase_video_call_webrtc/signaling.dart';
 import 'package:flutter_firebase_video_call_webrtc/video_render_view.dart';
 import 'package:flutter_webrtc/flutter_webrtc.dart';
+import 'package:uuid/uuid.dart';
 
 class WebRTCBody extends StatelessWidget {
-  final String roomId;
   final bool localRenderOk;
   final Map<String, RTCVideoRenderer> remoteRenderers;
   final Map<String, bool?> remoteRenderersLoading;
   final RTCVideoRenderer localRenderer;
-  final ValueChanged<String> onRoomIdChanged;
+  final TextEditingController controller;
   final Signaling signaling;
 
   const WebRTCBody({
     super.key,
-    required this.roomId,
     required this.localRenderOk,
     required this.remoteRenderers,
     required this.remoteRenderersLoading,
     required this.localRenderer,
-    required this.onRoomIdChanged,
+    required this.controller,
     required this.signaling,
   });
 
@@ -40,8 +39,14 @@ class WebRTCBody extends StatelessWidget {
                 const Text("Join room ID: "),
                 Flexible(
                   child: TextFormField(
-                    initialValue: roomId,
-                    onChanged: onRoomIdChanged,
+                    controller: controller,
+                    decoration: InputDecoration(
+                      suffixIcon: IconButton(
+                        tooltip: 'Generate new Room ID',
+                        icon: const Icon(Icons.generating_tokens_outlined),
+                        onPressed: () => controller.text = const Uuid().v4(),
+                      ),
+                    ),
                   ),
                 ),
               ],
@@ -51,8 +56,12 @@ class WebRTCBody extends StatelessWidget {
           // Streaming views
           Expanded(
             child: isLandscape
-                ? Row(children: _buildVideoViews())
-                : Column(children: _buildVideoViews()),
+                ? Row(
+                    children: _buildVideoViews(),
+                  )
+                : Column(
+                    children: _buildVideoViews(),
+                  ),
           ),
         ],
       ),
