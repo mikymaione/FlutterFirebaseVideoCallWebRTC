@@ -257,7 +257,7 @@ Link: $roomUrl
                   FloatingActionButton(
                     tooltip: 'Switch camera',
                     backgroundColor: Colors.grey,
-                    child: const Icon(Icons.switch_camera),
+                    child: const Icon(Icons.switch_video_outlined),
                     onPressed: () async => await doTry(
                       runAsync: () => signaling.switchCamera(),
                     ),

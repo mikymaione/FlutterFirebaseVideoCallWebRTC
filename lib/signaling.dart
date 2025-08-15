@@ -61,7 +61,7 @@ class Signaling {
       try {
         final cams = await Helper.cameras;
 
-        return kIsWeb ? min(cams.length, 1) : cams.length;
+        return cams.length;
       } catch (e) {
         // camera not accessible, like for screen sharing or other problems
         onGenericError?.call('Error: $e');
