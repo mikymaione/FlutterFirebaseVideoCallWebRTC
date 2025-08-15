@@ -177,7 +177,7 @@ class _MyHomePageState extends State<MyHomePage> {
     return Scaffold(
       appBar: AppBar(
         title: const Text(
-          'WebRTC - [MAIONE MIKΨ]',
+          'Callibre © 2022-2025, [MAIONE MIKΨ]',
         ),
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,

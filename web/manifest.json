@@ -3,9 +3,9 @@
     "short_name": "flutter_firebase_video_call_webrtc",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "a Flutter Video Call Demo using WebRTC, Coturn and Firebase",
+    "background_color": "#F79E10",
+    "theme_color": "#F79E10",
+    "description": "an open source Video Call System using WebRTC, Coturn and Firebase",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

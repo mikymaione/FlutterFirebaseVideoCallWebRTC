@@ -8,7 +8,7 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: true,
-      title: "WebRTC - [MAIONE MIKΨ]",
+      title: 'Callibre © 2022-2025, [MAIONE MIKΨ]',
       themeMode: ThemeMode.system,
       theme: ThemeData(
         brightness: Brightness.light,

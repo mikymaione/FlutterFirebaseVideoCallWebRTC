@@ -1,5 +1,5 @@
 name: flutter_firebase_video_call_webrtc
-description: a Flutter Video Call Demo using WebRTC, Coturn and Firebase
+description: an open source Video Call System using WebRTC, Coturn and Firebase
 
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
@@ -15,7 +15,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # In iOS, build-name is used as CFBundleShortVersionString while build-number used as CFBundleVersion.
 # Read more about iOS versioning at
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
-version: 1.0.0+1
+version: 25.20.0815+1
 
 environment:
   sdk: ">=3.3.0 <4.0.0"
