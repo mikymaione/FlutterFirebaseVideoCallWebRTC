@@ -172,6 +172,15 @@ class _MyHomePageState extends State<MyHomePage> {
     }
   }
 
+  bool isCameraClosed() {
+    try {
+      return !signaling.isCameraEnabled();
+    } catch (e) {
+      SnackMsg.showError(context, 'Error: $e');
+      return true;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -186,6 +195,7 @@ class _MyHomePageState extends State<MyHomePage> {
         initialData: 0,
         builder: (context, cameraCountSnap) => Wrap(
           spacing: 15,
+          runSpacing: 15,
           children: [
             if (roomIdController.text.length > 2) ...[
               FloatingActionButton(
@@ -214,7 +224,34 @@ Link: $roomUrl
                 },
               ),
             ],
-            if (!localRenderOk) ...[
+            if (localRenderOk) ...[
+              if (signaling.isJoined() && cameraCountSnap.hasData && cameraCountSnap.requireData > 1) ...[
+                FloatingActionButton(
+                  tooltip: 'Switch camera',
+                  backgroundColor: Colors.grey,
+                  child: const Icon(Icons.switch_video_outlined),
+                  onPressed: () async => await doTry(
+                    runAsync: () => signaling.switchCamera(),
+                  ),
+                )
+              ],
+              FloatingActionButton(
+                tooltip: isCameraClosed() ? 'Open camera' : 'Close camera',
+                backgroundColor: isCameraClosed() ? Colors.redAccent : Colors.grey,
+                child: isCameraClosed() ? const Icon(Icons.videocam_off_outlined) : const Icon(Icons.videocam_outlined),
+                onPressed: () => doTry(
+                  runSync: () => setState(() => signaling.toggleCamera()),
+                ),
+              ),
+              FloatingActionButton(
+                tooltip: isMicMuted() ? 'Un-mute mic' : 'Mute mic',
+                backgroundColor: isMicMuted() ? Colors.redAccent : Colors.grey,
+                child: isMicMuted() ? const Icon(Icons.mic_off) : const Icon(Icons.mic_outlined),
+                onPressed: () => doTry(
+                  runSync: () => setState(() => signaling.muteMic()),
+                ),
+              ),
+            ] else ...[
               FloatingActionButton(
                 tooltip: 'Open camera',
                 backgroundColor: Colors.redAccent,
@@ -253,24 +290,6 @@ Link: $roomUrl
                     onPressed: () => signaling.stopScreenSharing(),
                   ),
                 ],
-                if (cameraCountSnap.hasData && cameraCountSnap.requireData > 1) ...[
-                  FloatingActionButton(
-                    tooltip: 'Switch camera',
-                    backgroundColor: Colors.grey,
-                    child: const Icon(Icons.switch_video_outlined),
-                    onPressed: () async => await doTry(
-                      runAsync: () => signaling.switchCamera(),
-                    ),
-                  )
-                ],
-                FloatingActionButton(
-                  tooltip: isMicMuted() ? 'Un-mute mic' : 'Mute mic',
-                  backgroundColor: isMicMuted() ? Colors.redAccent : Colors.grey,
-                  child: isMicMuted() ? const Icon(Icons.mic_off) : const Icon(Icons.mic_outlined),
-                  onPressed: () => doTry(
-                    runSync: () => setState(() => signaling.muteMic()),
-                  ),
-                ),
                 FloatingActionButton(
                   tooltip: 'Hangup',
                   backgroundColor: Colors.red,

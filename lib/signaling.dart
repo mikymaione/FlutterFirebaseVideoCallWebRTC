@@ -38,9 +38,7 @@ class Signaling {
   final _iceServers = {
     'iceServers': [
       {
-        'urls': [
-          'stun:94.177.160.139:3478'
-        ],
+        'urls': ['stun:94.177.160.139:3478'],
       },
       {
         'urls': [
@@ -74,9 +72,44 @@ class Signaling {
   }
 
   Future<void> switchCamera() async {
-    if (!kIsWeb && _localStream != null) {
-      await Helper.switchCamera(_localStream!.getVideoTracks().first);
+    if (_localStream != null) {
+      final videoTracks = _localStream!.getVideoTracks();
+      final videoTrack = videoTracks.first;
+
+      if (kIsWeb) {
+        final settings = videoTrack.getSettings();
+        final currentDeviceId = settings['deviceId'];
+
+        final cams = await Helper.cameras;
+
+        final nextCam = cams.firstWhere(
+          (cam) => currentDeviceId == null || cam.deviceId != currentDeviceId,
+          orElse: () => cams.first,
+        );
+
+        await safeSwitchCameraWeb(nextCam.deviceId);
+      } else {
+        await Helper.switchCamera(videoTrack);
+      }
     }
+  }
+
+  Future<bool> safeSwitchCameraWeb(String targetDeviceId) async {
+    final mediaConstraints = {
+      'audio': true,
+      'video': {
+        'deviceId': targetDeviceId,
+      }
+    };
+
+    final newStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
+
+    _localStream?.getTracks().forEach((track) => track.stop());
+    _localStream = newStream;
+
+    await _replaceStream(_localStream!);
+
+    return true;
   }
 
   bool isMicMuted() {
@@ -85,7 +118,19 @@ class Signaling {
 
   bool isMicEnabled() {
     if (_localStream != null) {
-      return _localStream!.getAudioTracks().first.enabled;
+      return _localStream!.getAudioTracks().any(
+            (c) => c.enabled,
+          );
+    }
+
+    return true;
+  }
+
+  bool isCameraEnabled() {
+    if (_localStream != null) {
+      return _localStream!.getVideoTracks().any(
+            (c) => c.enabled,
+          );
     }
 
     return true;
@@ -121,7 +166,25 @@ class Signaling {
 
   void muteMic() {
     if (_localStream != null) {
-      _localStream!.getAudioTracks()[0].enabled = !isMicEnabled();
+      var enable = !isMicEnabled();
+
+      final tracks = _localStream!.getAudioTracks() ?? [];
+
+      for (final track in tracks) {
+        track.enabled = enable;
+      }
+    }
+  }
+
+  void toggleCamera() {
+    if (_localStream != null) {
+      var enable = !isCameraEnabled();
+
+      final tracks = _localStream!.getVideoTracks() ?? [];
+
+      for (final track in tracks) {
+        track.enabled = enable;
+      }
     }
   }
 
@@ -523,21 +586,17 @@ class Signaling {
   }
 
   Future<void> _replaceStream(MediaStream stream) async {
-    final track = stream.getVideoTracks().first;
+    final videoTracks = stream.getVideoTracks();
+    final track = videoTracks.first;
 
     for (final pc in _peerConnections.values) {
       final senders = await pc.getSenders();
 
       for (final s in senders) {
-        if ('video' == s.track?.kind) {
+        if (s.track != null && s.track!.kind == 'video') {
           await s.replaceTrack(track);
         }
       }
-    }
-
-    if (kDebugMode) {
-      print('Video tracks: ${stream.getVideoTracks().length}');
-      print('Audio tracks: ${stream.getAudioTracks().length}');
     }
 
     onAddLocalStream?.call(_localUuid!, localDisplayName, stream);
